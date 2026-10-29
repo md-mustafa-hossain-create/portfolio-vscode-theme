@@ -1,0 +1,6 @@
+{
+  "name": "MD Mustafa Hossain — VS Code Developer Portfolio",
+  "description": "Interactive VS Code-inspired developer portfolio for MD Mustafa Hossain, Frontend & React Developer, featuring file explorer navigation, keyboard shortcuts, custom terminal commands, and real-time cloud synchronization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
