@@ -28,8 +28,6 @@ export interface PortfolioSkill {
   experience: string;
   version: string;
   publisher: string;
-  downloads: string;
-  rating: string;
   logoUrl: string;
   projectsUsed: string[];
   codeExample: string;
@@ -88,10 +86,10 @@ export const DEVELOPER_PROFILE = {
   leadSubtitle:
     'I build clear, responsive interfaces with React, turning product ideas into focused experiences that are easy to use and maintain.',
   bioParagraphs: [
-    'Hello! I am MD Mustafa Hossain, a Bachelor of Computer Applications (BCA) graduate from Brainware University, West Bengal, India. I completed my degree with a CGPA of 9.09/10.',
-    'My passion for web development ignited during my academic years. Since then, I have focused heavily on mastering frontend development, learning how to build clean, responsive, and highly interactive user interfaces.',
-    'Currently, my primary toolkit centers around React JS and styling utilities like Tailwind CSS. I focus on creating pixel-accurate visuals, fast page-loads, and satisfying micro-interactions.',
-    'I am actively seeking Frontend Developer internships and entry-level positions where I can write solid code, learn from professional teams, and deliver immediate value to users.',
+    'Hello! I am MD Mustafa Hossain, a Frontend Developer based in West Bengal, India, focused on crafting clean, responsive, and accessible web applications.',
+    'My passion for web engineering drives me to build intuitive user interfaces where component architecture, state predictability, and visual polish work together seamlessly.',
+    'Currently, my primary toolkit centers around React JS and Tailwind CSS. I focus on creating pixel-accurate layouts, fast page-loads, and purposeful micro-interactions.',
+    'I am actively seeking Frontend Developer internships and entry-level roles where I can contribute production-ready code, collaborate with engineering teams, and deliver real value to users.',
   ],
   socials: [
     {
@@ -116,10 +114,10 @@ export const DEVELOPER_PROFILE = {
     },
   ],
   kpiMetrics: [
-    { label: 'Academic CGPA', value: '9.09 / 10', context: 'BCA · Brainware University (2024)' },
-    { label: 'Core Lighthouse Score', value: '98%', context: 'Across production React deployments' },
-    { label: 'Production Web Apps', value: '03', context: 'StreamPulse · DevDock · GeoLearn' },
-    { label: 'Primary Stack', value: 'React 19', context: 'Tailwind CSS · Firebase · Vite' },
+    { label: 'Core Focus', value: 'React & UI', context: 'Component Architecture & State' },
+    { label: 'Selected Projects', value: '03', context: 'StreamPulse · DevDock · GeoLearn' },
+    { label: 'Core Technologies', value: '09', context: 'React · JS · Tailwind · Firebase · Git' },
+    { label: 'Unique Visitors', value: 'LIVE', context: 'Real-time deduplicated portfolio visitors' },
   ],
 };
 
@@ -133,11 +131,11 @@ export const WORKSPACE_FILES: WorkspaceFile[] = [
     extension: 'tsx',
     navLabel: 'Overview',
     shortcut: 'Alt+1',
-    description: 'Developer profile, BCA academic summary, and core engineering philosophy.',
+    description: 'Developer profile, engineering focus, and core UI philosophy.',
     symbols: [
       { name: 'MustafaPortfolioOverview', kind: 'method', line: 6 },
       { name: 'heroProfileCard', kind: 'variable', line: 12 },
-      { name: 'kpiBenchmarks', kind: 'constant', line: 24 },
+      { name: 'portfolioHighlights', kind: 'constant', line: 24 },
       { name: 'aboutMeSection', kind: 'property', line: 34 },
     ],
   },
@@ -150,7 +148,7 @@ export const WORKSPACE_FILES: WorkspaceFile[] = [
     extension: 'tsx',
     navLabel: 'Projects',
     shortcut: 'Alt+2',
-    description: 'Selected frontend engineering case studies with architecture spotlights and benchmarks.',
+    description: 'Selected frontend engineering case studies with architecture spotlights and source links.',
     symbols: [
       { name: 'SELECTED_PROJECTS', kind: 'constant', line: 4 },
       { name: 'StreamPulse', kind: 'method', line: 10 },
@@ -215,26 +213,11 @@ export const WORKSPACE_FILES: WorkspaceFile[] = [
     extension: 'tsx',
     navLabel: 'Contact',
     shortcut: 'Alt+6',
-    description: 'Direct message dispatch and real-time synchronized developer guestbook.',
+    description: 'Direct message form and official social & email endpoints.',
     symbols: [
       { name: 'dispatchDirectMessage', kind: 'method', line: 5 },
       { name: 'directEndpoints', kind: 'constant', line: 20 },
-      { name: 'cloudPeerGuestbook', kind: 'variable', line: 30 },
-    ],
-  },
-  {
-    id: 'package.json',
-    name: 'package.json',
-    path: 'config/package.json',
-    folder: 'config',
-    language: 'JSON',
-    extension: 'json',
-    navLabel: 'Dependencies',
-    shortcut: 'Alt+7',
-    description: 'Workspace manifest and dependency graph for mustafa-dev-portfolio.',
-    symbols: [
-      { name: 'scripts', kind: 'property', line: 7 },
-      { name: 'dependencies', kind: 'property', line: 14 },
+      { name: 'availabilityDetails', kind: 'property', line: 30 },
     ],
   },
   {
@@ -245,8 +228,8 @@ export const WORKSPACE_FILES: WorkspaceFile[] = [
     language: 'JSON',
     extension: 'json',
     navLabel: 'Inbox',
-    shortcut: 'Alt+8',
-    description: 'Persisted incoming contact inquiries and recruiter messages from /api/messages.',
+    shortcut: 'Alt+7',
+    description: 'Private owner-only contact inbox protected by Firebase Authentication & Firestore rules.',
     symbols: [
       { name: 'incomingMessages', kind: 'property', line: 4 },
       { name: 'unreadCount', kind: 'constant', line: 12 },
@@ -261,7 +244,7 @@ export const INITIAL_PROJECTS: PortfolioProject[] = [
     category: 'Music Streaming App',
     year: '2026',
     description:
-      'A premium music streaming web application built with React, Tailwind CSS, and Firestore, featuring glassmorphism design and custom audio controller node APIs.',
+      'A music streaming web application built with React, Tailwind CSS, and Firestore, featuring glassmorphism design and custom audio controller node APIs.',
     github: 'https://github.com/md-mustafa-hossain-create/streampulse',
     demo: 'https://streampulse-demo.web.app',
     image: '/src/assets/images/project_streampulse_1793286953084.jpg',
@@ -278,11 +261,11 @@ export const INITIAL_PROJECTS: PortfolioProject[] = [
   return context;
 };`,
     metrics: [
-      { label: 'Lighthouse Score', value: '98%' },
-      { label: 'Audio Playback Latency', value: '12ms' },
-      { label: 'CLS (Layout Shift)', value: '0.00' },
+      { label: 'UI Architecture', value: 'React 19' },
+      { label: 'Audio Engine', value: 'Web Audio' },
+      { label: 'Cloud Store', value: 'Firestore' },
     ],
-    stars: 42,
+    stars: 0,
   },
   {
     id: 'devdock',
@@ -310,11 +293,11 @@ export const INITIAL_PROJECTS: PortfolioProject[] = [
   return current;
 }`,
     metrics: [
-      { label: 'Drag Render FPS', value: '60 fps' },
-      { label: 'State Sync Latency', value: '15ms' },
-      { label: 'Bundle Size Reduction', value: '32%' },
+      { label: 'UI Architecture', value: 'React 19' },
+      { label: 'Interaction', value: 'Drag & Drop' },
+      { label: 'State Storage', value: 'LocalStorage' },
     ],
-    stars: 38,
+    stars: 0,
   },
   {
     id: 'geolearn',
@@ -337,11 +320,11 @@ export const INITIAL_PROJECTS: PortfolioProject[] = [
 );
 worker.postMessage({ geoJsonData, viewportBounds });`,
     metrics: [
-      { label: 'Map Loading Speedup', value: '2.4x' },
-      { label: 'CLS (Layout Shift)', value: '0.01' },
-      { label: 'Offline Availability', value: '100%' },
+      { label: 'Map Engine', value: 'Leaflet.js' },
+      { label: 'Data Charts', value: 'Recharts' },
+      { label: 'Geometry Data', value: 'GeoJSON' },
     ],
-    stars: 31,
+    stars: 0,
   },
 ];
 
@@ -353,12 +336,10 @@ export const PORTFOLIO_SKILLS: PortfolioSkill[] = [
     category: 'Frontend Core',
     experience: 'Primary UI Framework',
     version: 'v19.0.1',
-    publisher: 'Meta Open Source · Verified by MUSTAFA.dev',
-    downloads: '24.8M',
-    rating: '5.0',
+    publisher: 'Meta Open Source',
     logoUrl: '/assets/skills/react.svg',
     projectsUsed: ['StreamPulse', 'DevDock', 'GeoLearn'],
-    codeExample: 'const [activeTab, setActiveTab] = useTransitionState("overview.tsx");',
+    codeExample: 'const [activeTab, setActiveTab] = useState("overview.tsx");',
   },
   {
     id: 'javascript',
@@ -367,12 +348,10 @@ export const PORTFOLIO_SKILLS: PortfolioSkill[] = [
     category: 'Frontend Core',
     experience: 'Core Language',
     version: 'ES2024',
-    publisher: 'ECMA International · Verified by MUSTAFA.dev',
-    downloads: '42.1M',
-    rating: '5.0',
+    publisher: 'ECMA International',
     logoUrl: '/assets/skills/javascript.svg',
     projectsUsed: ['StreamPulse', 'DevDock', 'GeoLearn'],
-    codeExample: 'const stream = await navigator.mediaDevices.getUserMedia({ audio: true });',
+    codeExample: 'const audioCtx = new window.AudioContext();',
   },
   {
     id: 'html5',
@@ -381,9 +360,7 @@ export const PORTFOLIO_SKILLS: PortfolioSkill[] = [
     category: 'Frontend Core',
     experience: 'Foundational Standard',
     version: 'v5.3',
-    publisher: 'W3C / WHATWG · Verified by MUSTAFA.dev',
-    downloads: '38.4M',
-    rating: '4.9',
+    publisher: 'W3C / WHATWG',
     logoUrl: '/assets/skills/html5.svg',
     projectsUsed: ['StreamPulse', 'DevDock', 'GeoLearn'],
     codeExample: '<main role="main" aria-label="Workspace Editor Canvas">',
@@ -395,9 +372,7 @@ export const PORTFOLIO_SKILLS: PortfolioSkill[] = [
     category: 'UI & Architecture',
     experience: 'Layout & Visuals',
     version: 'v3.0',
-    publisher: 'W3C CSS WG · Verified by MUSTAFA.dev',
-    downloads: '35.9M',
-    rating: '4.9',
+    publisher: 'W3C CSS Working Group',
     logoUrl: '/assets/skills/css3.svg',
     projectsUsed: ['StreamPulse', 'DevDock', 'GeoLearn'],
     codeExample: 'transform: translate3d(0, 0, 0); transition: opacity 150ms cubic-bezier(0.16, 1, 0.3, 1);',
@@ -409,9 +384,7 @@ export const PORTFOLIO_SKILLS: PortfolioSkill[] = [
     category: 'UI & Architecture',
     experience: 'Primary Styling Engine',
     version: 'v4.3.3',
-    publisher: 'Tailwind Labs · Verified by MUSTAFA.dev',
-    downloads: '19.6M',
-    rating: '5.0',
+    publisher: 'Tailwind Labs',
     logoUrl: '/assets/skills/tailwind.svg',
     projectsUsed: ['StreamPulse', 'DevDock', 'GeoLearn'],
     codeExample: 'className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch"',
@@ -423,9 +396,7 @@ export const PORTFOLIO_SKILLS: PortfolioSkill[] = [
     category: 'UI & Architecture',
     experience: 'Client Routing',
     version: 'v7.1.0',
-    publisher: 'Remix Software · Verified by MUSTAFA.dev',
-    downloads: '11.2M',
-    rating: '4.9',
+    publisher: 'Remix Software',
     logoUrl: '/assets/skills/react-router.svg',
     projectsUsed: ['StreamPulse', 'GeoLearn'],
     codeExample: 'const ProjectCaseStudy = lazy(() => import("./pages/ProjectCaseStudy"));',
@@ -433,16 +404,14 @@ export const PORTFOLIO_SKILLS: PortfolioSkill[] = [
   {
     id: 'firebase',
     name: 'Firebase',
-    desc: 'Firestore Real-Time Database & Hosting',
+    desc: 'Firestore Real-Time Database & Authentication',
     category: 'Backend & Tooling',
     experience: 'Cloud Persistence',
     version: 'v11.2.0',
-    publisher: 'Google Cloud · Verified by MUSTAFA.dev',
-    downloads: '14.5M',
-    rating: '4.9',
+    publisher: 'Google Cloud',
     logoUrl: '/assets/skills/firebase.svg',
     projectsUsed: ['StreamPulse', 'MUSTAFA.dev'],
-    codeExample: 'await addDoc(collection(db, "messages"), { name, email, message, timestamp });',
+    codeExample: 'await addDoc(collection(db, "messages"), { name, email, message, createdAt });',
   },
   {
     id: 'git',
@@ -451,12 +420,10 @@ export const PORTFOLIO_SKILLS: PortfolioSkill[] = [
     category: 'Backend & Tooling',
     experience: 'Source Control',
     version: 'v2.47.0',
-    publisher: 'Software Freedom Conservancy · Verified',
-    downloads: '48.0M',
-    rating: '5.0',
+    publisher: 'Software Freedom Conservancy',
     logoUrl: '/assets/skills/git.svg',
     projectsUsed: ['StreamPulse', 'DevDock', 'GeoLearn'],
-    codeExample: 'git checkout -b feat/vscode-terminal-shell',
+    codeExample: 'git checkout -b feat/portfolio-workbench',
   },
   {
     id: 'github',
@@ -464,13 +431,11 @@ export const PORTFOLIO_SKILLS: PortfolioSkill[] = [
     desc: 'Collaboration, CI Workflows & Code Review',
     category: 'Backend & Tooling',
     experience: 'Repository Hosting',
-    version: 'v2026.4',
-    publisher: 'GitHub · Verified by MUSTAFA.dev',
-    downloads: '39.2M',
-    rating: '5.0',
+    version: 'GitHub Cloud',
+    publisher: 'GitHub, Inc.',
     logoUrl: '/assets/skills/github.svg',
     projectsUsed: ['StreamPulse', 'DevDock', 'GeoLearn'],
-    codeExample: 'gh pr create --title "Optimize GeoJSON Web Worker chunking"',
+    codeExample: 'https://github.com/md-mustafa-hossain-create',
   },
 ];
 
@@ -532,7 +497,7 @@ Building a highly interactive and performant application required a modern front
 ### Core Technologies
 - **Framework (React 19 + Vite 8)**: React 19 provided the foundation for building a component-driven user interface, while Vite 8 delivered a fast development experience through lightning-fast module replacement and optimized production builds.
 - **Styling (Tailwind CSS v4)**: Tailwind CSS enabled rapid development of a consistent design system while making it easy to implement clean surface contrast and responsive layouts across mobile and desktop viewports.
-- **Backend & Real-Time Sync**: Cloud persistence handles contact form submissions, project telemetry, and dynamic content updates without page reloads.
+- **Backend & Real-Time Sync**: Cloud persistence handles contact form submissions, unique visitor tracking, and dynamic content updates without page reloads.
 - **Testing & Quality**: Components are structured with strict prop validation, keyboard accessibility, and clean error boundaries.
 
 ## Performance and Application Architecture
@@ -543,6 +508,6 @@ Performance was a key consideration throughout development. The application foll
 To reduce the initial bundle size and improve loading performance, heavier views of the application (such as case studies and article readers) are loaded on demand using React's lazy and Suspense APIs.
 
 ### Robust Form & State Handling
-The contact and feedback modules connect directly to our cloud persistence layer and include comprehensive state management for loading, success, and error states, giving visitors immediate feedback without page reloads.`,
+The contact module connects directly to our Firebase Firestore persistence layer with strict owner-only security rules, giving visitors immediate confirmation while keeping messages private.`,
   },
 ];

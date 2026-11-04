@@ -1,190 +1,296 @@
-import React from 'react';
-import { WorkspaceFile } from '../data/portfolioData';
+import React, { useState } from 'react';
 
 /**
- * Official Microsoft @vscode/codicons renderer.
- * Uses the authentic codicon.ttf icon font bundled with Visual Studio Code.
+ * 1. Official VS Code Codicon Helper (`<i class="codicon codicon-...">`)
+ * Uses the authentic `@vscode/codicons` icon font loaded in `index.html`.
  */
-interface CodiconProps {
+export const Codicon: React.FC<{
   name: string;
   className?: string;
-  spin?: boolean;
   title?: string;
-}
-
-export const Codicon: React.FC<CodiconProps> = ({
-  name,
-  className = '',
-  spin = false,
-  title,
-}) => {
-  return (
-    <i
-      title={title}
-      aria-hidden="true"
-      className={`codicon codicon-${name} ${spin ? 'codicon-modifier-spin' : ''} ${className}`}
-    />
-  );
-};
-
-/**
- * Official Visual Studio Code Multi-Layer Ribbon Logo SVG (from Devicon official vscode-original.svg)
- */
-export const OfficialVSCodeLogo: React.FC<{ className?: string }> = ({
-  className = 'w-4 h-4',
-}) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 128 128"
-    className={className}
-    aria-hidden="true"
-  >
-    <path
-      fill="#0065A9"
-      d="M123.471 13.82 97.097 1.12A7.973 7.973 0 0 0 88 2.668L1.662 81.387a5.333 5.333 0 0 0 .006 7.887l7.052 6.411a5.333 5.333 0 0 0 6.811.303l103.971-78.875c3.488-2.646 8.498-.158 8.498 4.22v-.306a8.001 8.001 0 0 0-4.529-7.208Z"
-    />
-    <path
-      fill="#007ACC"
-      d="m123.471 114.181-26.374 12.698A7.973 7.973 0 0 1 88 125.333L1.662 46.613a5.333 5.333 0 0 1 .006-7.887l7.052-6.411a5.333 5.333 0 0 1 6.811-.303l103.971 78.874c3.488 2.647 8.498.159 8.498-4.219v.306a8.001 8.001 0 0 1-4.529 7.208Z"
-    />
-    <path
-      fill="#1F9CF0"
-      d="M97.098 126.882A7.977 7.977 0 0 1 88 125.333c2.952 2.952 8 .861 8-3.314V5.98c0-4.175-5.048-6.266-8-3.313a7.977 7.977 0 0 1 9.098-1.549L123.467 13.8A8 8 0 0 1 128 21.01v85.982a8 8 0 0 1-4.533 7.21l-26.369 12.681Z"
-    />
-  </svg>
+  spin?: boolean;
+}> = ({ name, className = '', title, spin }) => (
+  <i
+    className={`codicon codicon-${name} ${
+      spin ? 'codicon-modifier-spin' : ''
+    } select-none inline-flex items-center justify-center ${className}`}
+    title={title}
+    aria-hidden={title ? undefined : 'true'}
+  />
 );
 
 /**
- * Official Seti File Theme Icons (Built into VS Code `extensions/theme-seti`)
+ * Verified Local Official SVG Paths (Priority 1: 0ms load, offline-ready, no network failure)
  */
-export const SetiFileIcon: React.FC<{
-  fileId?: string;
-  extension?: string;
-  className?: string;
-}> = ({ fileId, extension, className = 'w-4 h-4 shrink-0' }) => {
-  if (fileId === 'settings' || fileId === 'settings.json') {
+const LOCAL_SKILL_URLS: Record<string, string> = {
+  vscode: '/assets/skills/vscode.svg',
+  react: '/assets/skills/react.svg',
+  javascript: '/assets/skills/javascript.svg',
+  typescript: '/assets/skills/typescript.svg',
+  html5: '/assets/skills/html5.svg',
+  css3: '/assets/skills/css3.svg',
+  tailwind: '/assets/skills/tailwind.svg',
+  'react-router': '/assets/skills/react-router.svg',
+  firebase: '/assets/skills/firebase.svg',
+  git: '/assets/skills/git.svg',
+  github: '/assets/skills/github.svg',
+};
+
+/**
+ * Official Verified CDN Fallback URLs (Priority 2: Devicon & SimpleIcons)
+ */
+const CDN_SKILL_URLS: Record<string, string> = {
+  vscode:
+    'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/vscode/vscode-original.svg',
+  react:
+    'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/react/react-original.svg',
+  javascript:
+    'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/javascript/javascript-original.svg',
+  typescript:
+    'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/typescript/typescript-original.svg',
+  html5:
+    'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/html5/html5-original.svg',
+  css3:
+    'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/css3/css3-original.svg',
+  tailwind:
+    'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/tailwindcss/tailwindcss-original.svg',
+  'react-router':
+    'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/reactrouter/reactrouter-original.svg',
+  firebase:
+    'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/firebase/firebase-original.svg',
+  git: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/git/git-original.svg',
+  github:
+    'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/github/github-original.svg',
+};
+
+/**
+ * Verified Local Official VS Code File Icon SVGs (Priority 1: downloaded from vscode-icons repository)
+ */
+const LOCAL_FILE_URLS: Record<string, string> = {
+  tsx: '/assets/files/reactts.svg',
+  jsx: '/assets/files/reactts.svg',
+  ts: '/assets/files/typescript.svg',
+  js: '/assets/files/javascript.svg',
+  json: '/assets/files/json.svg',
+  md: '/assets/files/markdown.svg',
+  mdx: '/assets/files/mdx.svg',
+  git: '/assets/files/git.svg',
+  npm: '/assets/files/npm.svg',
+  config: '/assets/files/settings.svg',
+  settings: '/assets/files/settings.svg',
+};
+
+const CDN_FILE_URLS: Record<string, string> = {
+  tsx: 'https://cdn.jsdelivr.net/gh/vscode-icons/vscode-icons@master/icons/file_type_reactts.svg',
+  jsx: 'https://cdn.jsdelivr.net/gh/vscode-icons/vscode-icons@master/icons/file_type_reactjs.svg',
+  ts: 'https://cdn.jsdelivr.net/gh/vscode-icons/vscode-icons@master/icons/file_type_typescript_official.svg',
+  js: 'https://cdn.jsdelivr.net/gh/vscode-icons/vscode-icons@master/icons/file_type_js_official.svg',
+  json: 'https://cdn.jsdelivr.net/gh/vscode-icons/vscode-icons@master/icons/file_type_json.svg',
+  md: 'https://cdn.jsdelivr.net/gh/vscode-icons/vscode-icons@master/icons/file_type_markdown.svg',
+  mdx: 'https://cdn.jsdelivr.net/gh/gilbarbara/logos@main/logos/mdx.svg',
+  git: 'https://cdn.jsdelivr.net/gh/vscode-icons/vscode-icons@master/icons/file_type_git.svg',
+  npm: 'https://cdn.jsdelivr.net/gh/vscode-icons/vscode-icons@master/icons/file_type_npm.svg',
+  config:
+    'https://cdn.jsdelivr.net/gh/vscode-icons/vscode-icons@master/icons/file_type_config.svg',
+};
+
+/**
+ * 2. Official Visual Studio Code Ribbon Logo (`OfficialVSCodeLogo`)
+ * Renders the authentic official Microsoft Visual Studio Code icon from local SVG.
+ */
+export const OfficialVSCodeLogo: React.FC<{ className?: string }> = ({
+  className = 'w-4 h-4',
+}) => {
+  const [useFallback, setUseFallback] = useState(false);
+
+  if (!useFallback) {
     return (
-      <Codicon
-        name="settings-gear"
-        className={`!text-[14px] text-[#75BEFF] ${className}`}
+      <img
+        src="/assets/skills/vscode.svg"
+        alt="Visual Studio Code"
+        referrerPolicy="no-referrer"
+        onError={() => setUseFallback(true)}
+        className={`shrink-0 object-contain select-none ${className}`}
       />
     );
   }
 
-  if (fileId?.startsWith('extension:')) {
-    return (
-      <Codicon
-        name="extensions"
-        className={`!text-[14px] text-[#0078D4] ${className}`}
-      />
-    );
-  }
-
-  // package.json -> Official Seti npm icon
-  if (fileId === 'package.json') {
-    return (
-      <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-        <path
-          fill="#CC3E44"
-          d="M3 3h18v18H3V3zm3.5 3.5v11h5.5v-8.25h2.75v8.25h2.75v-11H6.5z"
-        />
-      </svg>
-    );
-  }
-
-  // .tsx / .ts -> Official React Atom Seti icon (#61DAFB)
-  if (extension === 'tsx' || extension === 'ts') {
-    return (
-      <svg viewBox="0 0 128 128" className={className} aria-hidden="true">
-        <g fill="#61DAFB">
-          <circle cx="64" cy="64" r="11.4" />
-          <path d="M107.3 45.2c-2.2-.8-4.5-1.6-6.9-2.3.6-2.4 1.1-4.8 1.5-7.1 2.1-13.2-.2-22.5-6.6-26.1-1.9-1.1-4-1.6-6.4-1.6-7 0-15.9 5.2-24.9 13.9-9-8.7-17.9-13.9-24.9-13.9-2.4 0-4.5.5-6.4 1.6-6.4 3.7-8.7 13-6.6 26.1.4 2.3.9 4.7 1.5 7.1-2.4.7-4.7 1.4-6.9 2.3C8.2 50 1.4 56.6 1.4 64s6.9 14 19.3 18.8c2.2.8 4.5 1.6 6.9 2.3-.6 2.4-1.1 4.8-1.5 7.1-2.1 13.2.2 22.5 6.6 26.1 1.9 1.1 4 1.6 6.4 1.6 7.1 0 16-5.2 24.9-13.9 9 8.7 17.9 13.9 24.9 13.9 2.4 0 4.5-.5 6.4-1.6 6.4-3.7 8.7-13 6.6-26.1-.4-2.3-.9-4.7-1.5-7.1 2.4-.7 4.7-1.4 6.9-2.3 12.5-4.8 19.3-11.4 19.3-18.8s-6.8-14-19.3-18.8zM92.5 14.7c4.1 2.4 5.5 9.8 3.8 20.3-.3 2.1-.8 4.3-1.4 6.6-5.2-1.2-10.7-2-16.5-2.5-3.4-4.8-6.9-9.1-10.4-13 7.4-7.3 14.9-12.3 21-12.3 1.3 0 2.5.3 3.5.9zM81.3 74c-1.8 3.2-3.9 6.4-6.1 9.6-3.7.3-7.4.4-11.2.4-3.9 0-7.6-.1-11.2-.4-2.2-3.2-4.2-6.4-6-9.6-1.9-3.3-3.7-6.7-5.3-10 1.6-3.3 3.4-6.7 5.3-10 1.8-3.2 3.9-6.4 6.1-9.6 3.7-.3 7.4-.4 11.2-.4 3.9 0 7.6.1 11.2.4 2.2 3.2 4.2 6.4 6 9.6 1.9 3.3 3.7 6.7 5.3 10-1.7 3.3-3.4 6.6-5.3 10zm8.3-3.3c1.5 3.5 2.7 6.9 3.8 10.3-3.4.8-7 1.4-10.8 1.9 1.2-1.9 2.5-3.9 3.6-6 1.2-2.1 2.3-4.2 3.4-6.2zM64 97.8c-2.4-2.6-4.7-5.4-6.9-8.3 2.3.1 4.6.2 6.9.2 2.3 0 4.6-.1 6.9-.2-2.2 2.9-4.5 5.7-6.9 8.3zm-18.6-15c-3.8-.5-7.4-1.1-10.8-1.9 1.1-3.3 2.3-6.8 3.8-10.3 1.1 2 2.2 4.1 3.4 6.1 1.2 2.2 2.4 4.1 3.6 6.1zm-7-25.5c-1.5-3.5-2.7-6.9-3.8-10.3 3.4-.8 7-1.4 10.8-1.9-1.2 1.9-2.5 3.9-3.6 6-1.2 2.1-2.3 4.2-3.4 6.2zM64 30.2c2.4 2.6 4.7 5.4 6.9 8.3-2.3-.1-4.6-.2-6.9-.2-2.3 0-4.6.1-6.9.2 2.2-2.9 4.5-5.7 6.9-8.3zm22.2 21l-3.6-6c3.8.5 7.4 1.1 10.8 1.9-1.1 3.3-2.3 6.8-3.8 10.3-1.1-2.1-2.2-4.2-3.4-6.2zM31.7 35c-1.7-10.5-.3-17.9 3.8-20.3 1-.6 2.2-.9 3.5-.9 6 0 13.5 4.9 21 12.3-3.5 3.8-7 8.2-10.4 13-5.8.5-11.3 1.4-16.5 2.5-.6-2.3-1-4.5-1.4-6.6zM7 64c0-4.7 5.7-9.7 15.7-13.4 2-.8 4.2-1.5 6.4-2.1 1.6 5 3.6 10.3 6 15.6-2.4 5.3-4.5 10.5-6 15.5C15.3 75.6 7 69.6 7 64zm28.5 49.3c-4.1-2.4-5.5-9.8-3.8-20.3.3-2.1.8-4.3 1.4-6.6 5.2 1.2 10.7 2 16.5 2.5 3.4 4.8 6.9 9.1 10.4 13-7.4 7.3-14.9 12.3-21 12.3-1.3 0-2.5-.3-3.5-.9zM96.3 93c1.7 10.5.3 17.9-3.8 20.3-1 .6-2.2.9-3.5.9-6 0-13.5-4.9-21-12.3 3.5-3.8 7-8.2 10.4-13 5.8-.5 11.3-1.4 16.5-2.5.6 2.3 1 4.5 1.4 6.6zm9-15.6c-2 .8-4.2 1.5-6.4 2.1-1.6-5-3.6-10.3-6-15.6 2.4-5.3 4.5-10.5 6-15.5 13.8 4 22.1 10 22.1 15.6 0 4.7-5.8 9.7-15.7 13.4z" />
-        </g>
-      </svg>
-    );
-  }
-
-  // .json -> Official Seti JSON curly braces icon (#CBCB41)
-  if (extension === 'json') {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-        <path
-          d="M8.5 4C6.8 4 6 4.9 6 6.5v2.7C6 10.4 5.2 11.2 4 11.2v1.6c1.2 0 2 .8 2 2v2.7C6 19.1 6.8 20 8.5 20h1v-1.8H8.8c-.7 0-1-.4-1-1.1v-2.8c0-1.1-.5-1.9-1.4-2.3.9-.4 1.4-1.2 1.4-2.3V6.9c0-.7.3-1.1 1-1.1h.7V4h-1zm7 0h-1v1.8h.7c.7 0 1 .4 1 1.1v2.8c0 1.1.5 1.9 1.4 2.3-.9.4-1.4 1.2-1.4 2.3v2.8c0 .7-.3 1.1-1 1.1h-.7V20h1c1.7 0 2.5-.9 2.5-2.5v-2.7c0-1.2.8-2 2-2v-1.6c-1.2 0-2-.8-2-2V6.5C18 4.9 17.2 4 15.5 4z"
-          fill="#CBCB41"
-        />
-      </svg>
-    );
-  }
-
-  // .mdx -> Official Seti MDX icon (#F9AC00)
-  if (extension === 'mdx') {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-        <rect
-          x="2"
-          y="4"
-          width="20"
-          height="16"
-          rx="2"
-          stroke="#F9AC00"
-          strokeWidth="1.6"
-        />
-        <path
-          d="M5.5 15.5V8.5L8.2 11.8L10.9 8.5V15.5M15.8 9L18.8 15M18.8 9L15.8 15"
-          stroke="#F9AC00"
-          strokeWidth="1.7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    );
-  }
-
-  // .md -> Official Seti Markdown icon (#519ABA)
+  // Exact official Microsoft VS Code vector markup
   return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
-      <rect
-        x="2"
-        y="4"
-        width="20"
-        height="16"
-        rx="2"
-        stroke="#519ABA"
-        strokeWidth="1.6"
-      />
-      <path
-        d="M5.5 15.5V8.5L8.5 12L11.5 8.5V15.5M16.5 8.5V15.5M16.5 15.5L14 13M16.5 15.5L19 13"
-        stroke="#519ABA"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 128 128"
+      className={`shrink-0 ${className}`}
+      aria-hidden="true"
+    >
+      <mask id="vsc-m" width="128" height="128" x="0" y="0" maskUnits="userSpaceOnUse">
+        <path
+          fill="#fff"
+          fillRule="evenodd"
+          clipRule="evenodd"
+          d="M90.767 127.126a7.968 7.968 0 0 0 6.35-.244l26.353-12.681a8 8 0 0 0 4.53-7.209V21.009a8 8 0 0 0-4.53-7.21L97.117 1.12a7.97 7.97 0 0 0-9.093 1.548l-50.45 46.026L15.6 32.013a5.328 5.328 0 0 0-6.807.302l-7.048 6.411a5.335 5.335 0 0 0-.006 7.888L20.796 64 1.74 81.387a5.336 5.336 0 0 0 .006 7.887l7.048 6.411a5.327 5.327 0 0 0 6.807.303l21.974-16.68 50.45 46.025a7.96 7.96 0 0 0 2.743 1.793Zm5.252-92.183L57.74 64l38.28 29.058V34.943Z"
+        />
+      </mask>
+      <g mask="url(#vsc-m)">
+        <path
+          fill="#0065A9"
+          d="M123.471 13.82 97.097 1.12A7.973 7.973 0 0 0 88 2.668L1.662 81.387a5.333 5.333 0 0 0 .006 7.887l7.052 6.411a5.333 5.333 0 0 0 6.811.303l103.971-78.875c3.488-2.646 8.498-.158 8.498 4.22v-.306a8.001 8.001 0 0 0-4.529-7.208Z"
+        />
+        <path
+          fill="#007ACC"
+          d="m123.471 114.181-26.374 12.698A7.973 7.973 0 0 1 88 125.333L1.662 46.613a5.333 5.333 0 0 1 .006-7.887l7.052-6.411a5.333 5.333 0 0 1 6.811-.303l103.971 78.874c3.488 2.647 8.498.159 8.498-4.219v.306a8.001 8.001 0 0 1-4.529 7.208Z"
+        />
+        <path
+          fill="#1F9CF0"
+          d="M97.098 126.882A7.977 7.977 0 0 1 88 125.333c2.952 2.952 8 .861 8-3.314V5.98c0-4.175-5.048-6.266-8-3.313a7.977 7.977 0 0 1 9.098-1.549L123.467 13.8A8 8 0 0 1 128 21.01v85.982a8 8 0 0 1-4.533 7.21l-26.369 12.681Z"
+        />
+      </g>
     </svg>
   );
 };
 
 /**
- * Official Multi-Color Tech Stack Brand Logos (from official Devicon SVGs in /public/assets/skills/*.svg)
- * Uses exact multi-layered official brand colors (W3C HTML5/CSS3 shields, Google Firebase 5-layer flame,
- * ES6 JavaScript yellow/black square, React #61DAFB atom, Tailwind #38BDF8 wave, React Router #F44250 + white nodes,
- * Git #F34F29 diamond, and GitHub Octocat).
+ * 3. Official VS Code File Icon Theme (`SetiFileIcon`)
+ * Renders authentic official `vscode-icons` SVGs for every file type.
+ */
+export const SetiFileIcon: React.FC<{
+  fileId?: string;
+  extension?: string;
+  filename?: string;
+  className?: string;
+}> = ({ fileId = '', extension = '', filename = '', className = 'w-4 h-4' }) => {
+  const [failCount, setFailCount] = useState(0);
+
+  const lower = (filename || fileId || `.${extension}`).toLowerCase();
+  const ext = extension.toLowerCase();
+
+  let fileKey = 'tsx';
+  if (lower.includes('package.json')) {
+    fileKey = 'npm';
+  } else if (lower.includes('tsconfig') || lower.endsWith('.json')) {
+    fileKey = lower.includes('tsconfig') ? 'config' : 'json';
+  } else if (lower.startsWith('.git')) {
+    fileKey = 'git';
+  } else if (ext === 'tsx' || lower.endsWith('.tsx') || ext === 'jsx' || lower.endsWith('.jsx')) {
+    fileKey = 'tsx';
+  } else if (ext === 'ts' || lower.endsWith('.ts')) {
+    fileKey = 'ts';
+  } else if (ext === 'js' || lower.endsWith('.js')) {
+    fileKey = 'js';
+  } else if (ext === 'mdx' || lower.endsWith('.mdx')) {
+    fileKey = 'mdx';
+  } else if (ext === 'md' || lower.endsWith('.md')) {
+    fileKey = 'md';
+  } else if (lower.includes('setting') || lower.includes('config')) {
+    fileKey = 'settings';
+  }
+
+  // Source priority: 1. Local downloaded SVG -> 2. CDN URL -> 3. Codicon
+  const primarySrc = LOCAL_FILE_URLS[fileKey];
+  const cdnSrc = CDN_FILE_URLS[fileKey];
+
+  if (failCount === 0 && primarySrc) {
+    return (
+      <img
+        src={primarySrc}
+        alt=""
+        aria-hidden="true"
+        onError={() => setFailCount(1)}
+        className={`shrink-0 object-contain select-none ${className}`}
+      />
+    );
+  }
+
+  if (failCount === 1 && cdnSrc) {
+    return (
+      <img
+        src={cdnSrc}
+        alt=""
+        aria-hidden="true"
+        referrerPolicy="no-referrer"
+        onError={() => setFailCount(2)}
+        className={`shrink-0 object-contain select-none ${className}`}
+      />
+    );
+  }
+
+  // Fallback to crisp Codicon
+  const codiconMap: Record<string, string> = {
+    tsx: 'symbol-react',
+    ts: 'symbol-method',
+    js: 'symbol-variable',
+    json: 'json',
+    md: 'markdown',
+    mdx: 'markdown',
+    git: 'git-merge',
+    npm: 'package',
+    settings: 'gear',
+  };
+
+  return (
+    <Codicon
+      name={codiconMap[fileKey] || 'file'}
+      className={`text-[#858585] ${className}`}
+    />
+  );
+};
+
+/**
+ * 4. Official Multi-Color Brand Technology Logos (`OfficialSkillIcon`)
+ * Loads authentic Devicon / SimpleIcons SVGs downloaded locally with zero latency,
+ * CDN backup, and exact official vector rendering.
  */
 export const OfficialSkillIcon: React.FC<{
   skillId: string;
   className?: string;
-}> = ({ skillId, className = 'w-6 h-6 shrink-0' }) => {
-  switch (skillId.toLowerCase()) {
+  theme?: 'dark' | 'light';
+}> = ({ skillId, className = 'w-6 h-6', theme = 'dark' }) => {
+  const [failCount, setFailCount] = useState(0);
+
+  const normalizedId = skillId.toLowerCase().trim();
+  const localSrc = LOCAL_SKILL_URLS[normalizedId];
+  const cdnSrc = CDN_SKILL_URLS[normalizedId];
+
+  // For GitHub mark, adjust contrast if in light theme
+  const isGithub = normalizedId === 'github';
+  const githubClass = isGithub && theme === 'light' ? 'invert-0' : isGithub ? '' : '';
+
+  if (failCount === 0 && localSrc) {
+    return (
+      <img
+        src={localSrc}
+        alt={skillId}
+        onError={() => setFailCount(1)}
+        className={`shrink-0 object-contain select-none ${githubClass} ${className}`}
+      />
+    );
+  }
+
+  if (failCount === 1 && cdnSrc) {
+    return (
+      <img
+        src={cdnSrc}
+        alt={skillId}
+        referrerPolicy="no-referrer"
+        onError={() => setFailCount(2)}
+        className={`shrink-0 object-contain select-none ${githubClass} ${className}`}
+      />
+    );
+  }
+
+  // Exact official SimpleIcons / Devicon vector fallback if images blocked
+  switch (normalizedId) {
     case 'react':
       return (
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 128 128"
-          className={className}
-          aria-label="React JS Official Logo"
+          className={`shrink-0 ${className}`}
+          aria-hidden="true"
         >
           <g fill="#61DAFB">
             <circle cx="64" cy="64" r="11.4" />
-            <path d="M107.3 45.2c-2.2-.8-4.5-1.6-6.9-2.3.6-2.4 1.1-4.8 1.5-7.1 2.1-13.2-.2-22.5-6.6-26.1-1.9-1.1-4-1.6-6.4-1.6-7 0-15.9 5.2-24.9 13.9-9-8.7-17.9-13.9-24.9-13.9-2.4 0-4.5.5-6.4 1.6-6.4 3.7-8.7 13-6.6 26.1.4 2.3.9 4.7 1.5 7.1-2.4.7-4.7 1.4-6.9 2.3C8.2 50 1.4 56.6 1.4 64s6.9 14 19.3 18.8c2.2.8 4.5 1.6 6.9 2.3-.6 2.4-1.1 4.8-1.5 7.1-2.1 13.2.2 22.5 6.6 26.1 1.9 1.1 4 1.6 6.4 1.6 7.1 0 16-5.2 24.9-13.9 9 8.7 17.9 13.9 24.9 13.9 2.4 0 4.5-.5 6.4-1.6 6.4-3.7 8.7-13 6.6-26.1-.4-2.3-.9-4.7-1.5-7.1 2.4-.7 4.7-1.4 6.9-2.3 12.5-4.8 19.3-11.4 19.3-18.8s-6.8-14-19.3-18.8zM92.5 14.7c4.1 2.4 5.5 9.8 3.8 20.3-.3 2.1-.8 4.3-1.4 6.6-5.2-1.2-10.7-2-16.5-2.5-3.4-4.8-6.9-9.1-10.4-13 7.4-7.3 14.9-12.3 21-12.3 1.3 0 2.5.3 3.5.9zM81.3 74c-1.8 3.2-3.9 6.4-6.1 9.6-3.7.3-7.4.4-11.2.4-3.9 0-7.6-.1-11.2-.4-2.2-3.2-4.2-6.4-6-9.6-1.9-3.3-3.7-6.7-5.3-10 1.6-3.3 3.4-6.7 5.3-10 1.8-3.2 3.9-6.4 6.1-9.6 3.7-.3 7.4-.4 11.2-.4 3.9 0 7.6.1 11.2.4 2.2 3.2 4.2 6.4 6 9.6 1.9 3.3 3.7 6.7 5.3 10-1.7 3.3-3.4 6.6-5.3 10zm8.3-3.3c1.5 3.5 2.7 6.9 3.8 10.3-3.4.8-7 1.4-10.8 1.9 1.2-1.9 2.5-3.9 3.6-6 1.2-2.1 2.3-4.2 3.4-6.2zM64 97.8c-2.4-2.6-4.7-5.4-6.9-8.3 2.3.1 4.6.2 6.9.2 2.3 0 4.6-.1 6.9-.2-2.2 2.9-4.5 5.7-6.9 8.3zm-18.6-15c-3.8-.5-7.4-1.1-10.8-1.9 1.1-3.3 2.3-6.8 3.8-10.3 1.1 2 2.2 4.1 3.4 6.1 1.2 2.2 2.4 4.1 3.6 6.1zm-7-25.5c-1.5-3.5-2.7-6.9-3.8-10.3 3.4-.8 7-1.4 10.8-1.9-1.2 1.9-2.5 3.9-3.6 6-1.2 2.1-2.3 4.2-3.4 6.2zM64 30.2c2.4 2.6 4.7 5.4 6.9 8.3-2.3-.1-4.6-.2-6.9-.2-2.3 0-4.6.1-6.9.2 2.2-2.9 4.5-5.7 6.9-8.3zm22.2 21l-3.6-6c3.8.5 7.4 1.1 10.8 1.9-1.1 3.3-2.3 6.8-3.8 10.3-1.1-2.1-2.2-4.2-3.4-6.2zM31.7 35c-1.7-10.5-.3-17.9 3.8-20.3 1-.6 2.2-.9 3.5-.9 6 0 13.5 4.9 21 12.3-3.5 3.8-7 8.2-10.4 13-5.8.5-11.3 1.4-16.5 2.5-.6-2.3-1-4.5-1.4-6.6zM7 64c0-4.7 5.7-9.7 15.7-13.4 2-.8 4.2-1.5 6.4-2.1 1.6 5 3.6 10.3 6 15.6-2.4 5.3-4.5 10.5-6 15.5C15.3 75.6 7 69.6 7 64zm28.5 49.3c-4.1-2.4-5.5-9.8-3.8-20.3.3-2.1.8-4.3 1.4-6.6 5.2 1.2 10.7 2 16.5 2.5 3.4 4.8 6.9 9.1 10.4 13-7.4 7.3-14.9 12.3-21 12.3-1.3 0-2.5-.3-3.5-.9zM96.3 93c1.7 10.5.3 17.9-3.8 20.3-1 .6-2.2.9-3.5.9-6 0-13.5-4.9-21-12.3 3.5-3.8 7-8.2 10.4-13 5.8-.5 11.3-1.4 16.5-2.5.6 2.3 1 4.5 1.4 6.6zm9-15.6c-2 .8-4.2 1.5-6.4 2.1-1.6-5-3.6-10.3-6-15.6 2.4-5.3 4.5-10.5 6-15.5 13.8 4 22.1 10 22.1 15.6 0 4.7-5.8 9.7-15.7 13.4z" />
+            <path d="M107.3 45.2c-2.2-.8-4.5-1.6-6.9-2.3.6-2.4 1.1-4.8 1.5-7.1 2.1-13.2-.2-22.5-6.6-26.1-1.9-1.1-4-1.6-6.4-1.6-7 0-15.9 5.2-24.9 13.9-9-8.7-17.9-13.9-24.9-13.9-2.4 0-4.5.5-6.4 1.6-6.4 3.7-8.7 13-6.6 26.1.4 2.3.9 4.7 1.5 7.1-2.4.7-4.7 1.4-6.9 2.3C8.2 50 1.4 56.6 1.4 64s6.9 14 19.3 18.8c2.2.8 4.5 1.6 6.9 2.3-.6 2.4-1.1 4.8-1.5 7.1-2.1 13.2.2 22.5 6.6 26.1 1.9 1.1 4 1.6 6.4 1.6 7.1 0 16-5.2 24.9-13.9 9 8.7 17.9 13.9 24.9 13.9 2.4 0 4.5-.5 6.4-1.6 6.4-3.7 8.7-13 6.6-26.1-.4-2.3-.9-4.7-1.5-7.1 2.4-.7 4.7-1.4 6.9-2.3 12.5-4.8 19.3-11.4 19.3-18.8s-6.8-14-19.3-18.8z" />
           </g>
         </svg>
       );
@@ -194,8 +300,8 @@ export const OfficialSkillIcon: React.FC<{
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 128 128"
-          className={className}
-          aria-label="JavaScript Official Logo"
+          className={`shrink-0 ${className}`}
+          aria-hidden="true"
         >
           <path fill="#F0DB4F" d="M1.408 1.408h125.184v125.185H1.408z" />
           <path
@@ -205,95 +311,17 @@ export const OfficialSkillIcon: React.FC<{
         </svg>
       );
 
-    case 'html5':
-      return (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 128 128"
-          className={className}
-          aria-label="HTML5 Official Logo"
-        >
-          <path
-            fill="#E44D26"
-            d="M19.037 113.876L9.032 1.661h109.936l-10.016 112.198-45.019 12.48z"
-          />
-          <path fill="#F16529" d="M64 116.8l36.378-10.086 8.559-95.878H64z" />
-          <path
-            fill="#EBEBEB"
-            d="M64 52.455H45.788L44.53 38.361H64V24.599H29.489l.33 3.692 3.382 37.927H64zm0 35.743l-.061.017-15.327-4.14-.979-10.975H33.816l1.928 21.609 28.193 7.826.063-.017z"
-          />
-          <path
-            fill="#fff"
-            d="M63.952 52.455v13.763h16.947l-1.597 17.849-15.35 4.143v14.319l28.215-7.82.207-2.325 3.234-36.233.335-3.696h-3.708zm0-27.856v13.762h33.244l.276-3.092.628-6.978.329-3.692z"
-          />
-        </svg>
-      );
-
-    case 'css3':
-      return (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 128 128"
-          className={className}
-          aria-label="CSS3 Official Logo"
-        >
-          <path
-            fill="#1572B6"
-            d="M18.814 114.123L8.76 1.352h110.48l-10.064 112.754-45.243 12.543-45.119-12.526z"
-          />
-          <path
-            fill="#33A9DC"
-            d="M64.001 117.062l36.559-10.136 8.601-96.354h-45.16v106.49z"
-          />
-          <path
-            fill="#fff"
-            d="M64.001 51.429h18.302l1.264-14.163H64.001V23.435h34.682l-.332 3.711-3.4 38.114h-30.95V51.429z"
-          />
-          <path
-            fill="#EBEBEB"
-            d="M64.083 87.349l-.061.018-15.403-4.159-.985-11.031H33.752l1.937 21.717 28.331 7.863.063-.018v-14.39z"
-          />
-          <path
-            fill="#fff"
-            d="M81.127 64.675l-1.666 18.522-15.426 4.164v14.39l28.354-7.858.208-2.337 2.406-26.881H81.127z"
-          />
-          <path
-            fill="#EBEBEB"
-            d="M64.048 23.435v13.831H30.64l-.277-3.108-.63-7.012-.331-3.711h34.646zm-.047 27.996v13.831H48.792l-.277-3.108-.631-7.012-.33-3.711h16.447z"
-          />
-        </svg>
-      );
-
     case 'tailwind':
       return (
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 128 128"
-          className={className}
-          aria-label="Tailwind CSS Official Logo"
+          className={`shrink-0 ${className}`}
+          aria-hidden="true"
         >
           <path
             d="M64.004 25.602c-17.067 0-27.73 8.53-32 25.597 6.398-8.531 13.867-11.73 22.398-9.597 4.871 1.214 8.352 4.746 12.207 8.66C72.883 56.629 80.145 64 96.004 64c17.066 0 27.73-8.531 32-25.602-6.399 8.536-13.867 11.735-22.399 9.602-4.87-1.215-8.347-4.746-12.207-8.66-6.27-6.367-13.53-13.738-29.394-13.738zM32.004 64c-17.066 0-27.73 8.531-32 25.602C6.402 81.066 13.87 77.867 22.402 80c4.871 1.215 8.352 4.746 12.207 8.66 6.274 6.367 13.536 13.738 29.395 13.738 17.066 0 27.73-8.53 32-25.597-6.399 8.531-13.867 11.73-22.399 9.597-4.87-1.214-8.347-4.746-12.207-8.66C55.128 71.371 47.868 64 32.004 64zm0 0"
-            fill="#38BDF8"
-          />
-        </svg>
-      );
-
-    case 'react-router':
-      return (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 128 128"
-          className={className}
-          aria-label="React Router Official Logo"
-        >
-          <path
-            d="M99.04 50.315c-3.646-1.148-5.528-.761-9.351-1.18-5.91-.645-8.265-2.959-9.264-8.913-.559-3.324.101-8.191-1.326-11.204-2.729-5.746-9.115-8.323-15.53-6.852-5.417 1.244-9.924 6.666-10.174 12.232-.285 6.355 3.33 11.778 9.537 13.65 2.95.89 6.083 1.338 9.163 1.565 5.649.413 6.083 3.558 7.61 6.147.964 1.632 1.897 3.24 1.897 8.107s-.939 6.474-1.896 8.106c-1.528 2.583-3.413 4.275-9.062 4.693-3.08.228-6.22.676-9.162 1.567-6.208 1.877-9.823 7.293-9.538 13.649.25 5.566 4.757 10.988 10.174 12.232 6.415 1.476 12.801-1.106 15.53-6.852 1.433-3.013 2.218-6.427 2.777-9.75 1.005-5.955 3.36-8.269 9.264-8.915 3.823-.418 7.78 0 11.363-2.038 3.785-2.77 7.168-6.93 7.168-12.692 0-5.764-3.645-11.806-9.18-13.552z"
-            fill="#F44250"
-          />
-          <path
-            d="M38.4 77.373c-7.45 0-13.528-6.098-13.528-13.575 0-7.476 6.077-13.574 13.527-13.574 7.45 0 13.528 6.098 13.528 13.574 0 7.47-6.083 13.575-13.528 13.575zM13.48 104.96C6.04 104.942-.018 98.82 0 91.337c.018-7.47 6.119-13.55 13.575-13.526 7.444.018 13.503 6.14 13.48 13.622-.018 7.464-6.12 13.545-13.575 13.527zm100.512 0c-7.462.041-13.586-6.015-13.629-13.473-.041-7.488 5.994-13.634 13.426-13.676 7.462-.042 13.587 6.014 13.629 13.472.041 7.482-5.994 13.635-13.426 13.677z"
-            fill="#E5E5E5"
+            fill="#38bdf8"
           />
         </svg>
       );
@@ -303,28 +331,12 @@ export const OfficialSkillIcon: React.FC<{
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 128 128"
-          className={className}
-          aria-label="Google Firebase Official Logo"
+          className={`shrink-0 ${className}`}
+          aria-hidden="true"
         >
-          <path
-            fill="#FFA000"
-            d="M17.474 103.276 33.229 2.462a2.91 2.91 0 0 1 5.44-.924l16.294 30.39 6.494-12.366a2.91 2.91 0 0 1 5.15 0l43.97 83.714H17.474Z"
-          />
-          <path fill="#F57C00" d="M71.903 64.005 54.955 31.913l-37.481 71.363Z" />
-          <path
-            fill="#FFCA28"
-            d="M110.577 103.276 98.51 28.604a2.913 2.913 0 0 0-1.984-2.286 2.906 2.906 0 0 0-2.94.714l-76.112 76.243 42.115 23.618a8.728 8.728 0 0 0 8.51 0l42.478-23.618Z"
-          />
-          <path
-            fill="#FFFFFF"
-            fillOpacity=".2"
-            d="M98.51 28.604a2.913 2.913 0 0 0-1.984-2.286 2.906 2.906 0 0 0-2.94.713L78.479 42.178 66.6 19.562a2.91 2.91 0 0 0-5.15 0l-6.494 12.365L38.662 1.538A2.91 2.91 0 0 0 35.605.044a2.907 2.907 0 0 0-2.384 2.425L17.474 103.276h-.051l.05.058.415.204 75.676-75.764a2.91 2.91 0 0 1 4.932 1.571l11.965 74.003.116-.073L98.51 28.603Zm-80.898 74.534L33.228 3.182A2.91 2.91 0 0 1 35.613.756a2.911 2.911 0 0 1 3.057 1.495l16.292 30.39 6.495-12.366a2.91 2.91 0 0 1 5.15 0L78.245 42.41 17.61 103.138Z"
-          />
-          <path
-            fill="#A52714"
-            d="M68.099 126.18a8.728 8.728 0 0 1-8.51 0l-42.015-23.55-.102.647 42.115 23.61a8.728 8.728 0 0 0 8.51 0l42.48-23.61-.11-.67-42.37 23.575z"
-            opacity=".2"
-          />
+          <path fill="#ffa000" d="M17.474 103.276 33.229 2.462a2.91 2.91 0 0 1 5.44-.924l16.294 30.39 6.494-12.366a2.91 2.91 0 0 1 5.15 0l43.97 83.714H17.474Z" />
+          <path fill="#f57c00" d="M71.903 64.005 54.955 31.913l-37.481 71.363Z" />
+          <path fill="#ffca28" d="M110.577 103.276 98.51 28.604a2.913 2.913 0 0 0-1.984-2.286 2.906 2.906 0 0 0-2.94.714l-76.112 76.243 42.115 23.618a8.728 8.728 0 0 0 8.51 0l42.478-23.618Z" />
         </svg>
       );
 
@@ -333,13 +345,43 @@ export const OfficialSkillIcon: React.FC<{
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 128 128"
-          className={className}
-          aria-label="Git Official Logo"
+          className={`shrink-0 ${className}`}
+          aria-hidden="true"
         >
           <path
-            fill="#F34F29"
-            d="M124.737 58.378L69.621 3.264c-3.172-3.174-8.32-3.174-11.497 0L46.68 14.71l14.518 14.518c3.375-1.139 7.243-.375 9.932 2.314 2.703 2.706 3.461 6.607 2.294 9.993l13.992 13.993c3.385-1.167 7.292-.413 9.994 2.295 3.78 3.777 3.78 9.9 0 13.679a9.673 9.673 0 01-13.683 0 9.677 9.677 0 01-2.105-10.521L68.574 47.933l-.002 34.341a9.708 9.708 0 012.559 1.828c3.778 3.777 3.778 9.898 0 13.683-3.779 3.777-9.904 3.777-13.679 0-3.778-3.784-3.778-9.905 0-13.683a9.65 9.65 0 013.167-2.11V47.333a9.581 9.581 0 01-3.167-2.111c-2.862-2.86-3.551-7.06-2.083-10.576L41.056 20.333 3.264 58.123a8.133 8.133 0 000 11.5l55.117 55.114c3.174 3.174 8.32 3.174 11.499 0l54.858-54.858a8.135 8.135 0 00-.001-11.501z"
+            fill="#F05032"
+            d="M124.6 57.3L70.7 3.4c-4.5-4.5-11.8-4.5-16.3 0L39.8 17.9l17.8 17.8c4.3-.8 8.8.5 12 3.7 3.2 3.2 4.4 7.6 3.7 11.9l17.2 17.2c4.3-.7 8.7.5 11.9 3.7 4.5 4.5 4.5 11.8 0 16.3-4.5 4.5-11.8 4.5-16.3 0-3.3-3.3-4.5-7.8-3.6-12.1L66.7 60.3v34.3c.9.5 1.8 1.1 2.6 1.9 4.5 4.5 4.5 11.8 0 16.3s-11.8 4.5-16.3 0-4.5-11.8 0-16.3c1.1-1.1 2.4-1.9 3.8-2.4V59.4c-1.4-.5-2.7-1.3-3.8-2.4-3.4-3.4-4.5-8.1-3.4-12.5L32.8 27 3.4 56.4c-4.5 4.5-4.5 11.8 0 16.3l53.9 53.9c4.5 4.5 11.8 4.5 16.3 0l51-51c4.5-4.4 4.5-11.8 0-16.3z"
           />
+        </svg>
+      );
+
+    case 'html5':
+      return (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 128 128"
+          className={`shrink-0 ${className}`}
+          aria-hidden="true"
+        >
+          <path d="M19.387 11.488h89.226l-8.118 90.963-36.46 10.125-36.564-10.14-8.084-90.948z" fill="#E44D26" />
+          <path d="M64.035 104.398l29.418-8.156 6.945-77.742H64.035v85.898z" fill="#F16529" />
+          <path d="M64.035 52.887H47.887l-1.117-12.535h34.527V27.426H33.844l3.352 37.957h26.839v-12.496zm0 28.539l-.086.023-14.074-3.8-1.02-11.422H36.312l1.996 22.375 25.641 7.121.086-.023V81.426z" fill="#EBEBEB" />
+          <path d="M63.992 52.887v12.496h14.887l-1.402 15.695-13.484 3.645v12.723l25.637-7.117.156-1.742 2.871-32.148.336-3.551H63.992zm0-25.461v12.926h30.082l1.152-12.926H63.992z" fill="#FFF" />
+        </svg>
+      );
+
+    case 'css3':
+      return (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 128 128"
+          className={`shrink-0 ${className}`}
+          aria-hidden="true"
+        >
+          <path d="M19.387 11.488h89.226l-8.118 90.963-36.46 10.125-36.564-10.14-8.084-90.948z" fill="#1572B6" />
+          <path d="M64.035 104.398l29.418-8.156 6.945-77.742H64.035v85.898z" fill="#33A9DC" />
+          <path d="M64.035 52.887H47.887l-1.117-12.535h34.527V27.426H33.844l3.352 37.957h26.839v-12.496zm0 28.539l-.086.023-14.074-3.8-1.02-11.422H36.312l1.996 22.375 25.641 7.121.086-.023V81.426z" fill="#EBEBEB" />
+          <path d="M63.992 52.887v12.496h14.887l-1.402 15.695-13.484 3.645v12.723l25.637-7.117.156-1.742 2.871-32.148.336-3.551H63.992zm0-25.461v12.926h30.082l1.152-12.926H63.992z" fill="#FFF" />
         </svg>
       );
 
@@ -349,10 +391,10 @@ export const OfficialSkillIcon: React.FC<{
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 128 128"
-          className={className}
-          aria-label="GitHub Official Logo"
+          className={`shrink-0 ${className}`}
+          aria-hidden="true"
         >
-          <g fill="#FFFFFF">
+          <g fill={theme === 'light' ? '#24292F' : '#FFFFFF'}>
             <path
               fillRule="evenodd"
               clipRule="evenodd"
@@ -362,4 +404,65 @@ export const OfficialSkillIcon: React.FC<{
         </svg>
       );
   }
+};
+
+/**
+ * 5. Official Google Gemini Logo (`OfficialGeminiLogo`)
+ * Renders the authentic Google Gemini AI Sparkle vector from local downloaded asset.
+ */
+export const OfficialGeminiLogo: React.FC<{ className?: string }> = ({
+  className = 'w-6 h-6',
+}) => {
+  const [failCount, setFailCount] = useState(0);
+
+  if (failCount === 0) {
+    return (
+      <img
+        src="/assets/gemini.svg"
+        alt="Google Gemini AI"
+        onError={() => setFailCount(1)}
+        className={`shrink-0 object-contain select-none ${className}`}
+      />
+    );
+  }
+
+  if (failCount === 1) {
+    return (
+      <img
+        src="https://www.gstatic.com/lamda/images/gemini_sparkle_v002_d4735304ff6292a690345.svg"
+        alt="Google Gemini AI"
+        referrerPolicy="no-referrer"
+        onError={() => setFailCount(2)}
+        className={`shrink-0 object-contain select-none ${className}`}
+      />
+    );
+  }
+
+  return (
+    <svg
+      viewBox="0 0 28 28"
+      xmlns="http://www.w3.org/2000/svg"
+      className={`shrink-0 ${className}`}
+      aria-hidden="true"
+    >
+      <defs>
+        <radialGradient
+          id="official-gemini-spark"
+          cx="0"
+          cy="0"
+          r="1"
+          gradientUnits="userSpaceOnUse"
+          gradientTransform="translate(2.77876 11.3795) rotate(18.6832) scale(29.8025 238.737)"
+        >
+          <stop offset="0.0671246" stopColor="#9168C0" />
+          <stop offset="0.342551" stopColor="#5684D1" />
+          <stop offset="0.672076" stopColor="#1BA1E3" />
+        </radialGradient>
+      </defs>
+      <path
+        d="M14 28C14 26.0633 13.6267 24.2433 12.88 22.54C12.1567 20.8367 11.165 19.355 9.905 18.095C8.645 16.835 7.16333 15.8433 5.46 15.12C3.75667 14.3733 1.93667 14 0 14C1.93667 14 3.75667 13.6383 5.46 12.915C7.16333 12.1683 8.645 11.165 9.905 9.905C11.165 8.645 12.1567 7.16333 12.88 5.46C13.6267 3.75667 14 1.93667 14 0C14 1.93667 14.3617 3.75667 15.085 5.46C15.8317 7.16333 16.835 8.645 18.095 9.905C19.355 11.165 20.8367 12.1683 22.54 12.915C24.2433 13.6383 26.0633 14 28 14C26.0633 14 24.2433 14.3733 22.54 15.12C20.8367 15.8433 19.355 16.835 18.095 18.095C16.835 19.355 15.8317 20.8367 15.085 22.54C14.3617 24.2433 14 26.0633 14 28Z"
+        fill="url(#official-gemini-spark)"
+      />
+    </svg>
+  );
 };

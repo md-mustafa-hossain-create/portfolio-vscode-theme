@@ -1,6 +1,6 @@
 {
-  "summary":  "Implementation plan for upgrading MUSTAFA.dev VS Code Portfolio with a full zero-setup Express + persistent local store backend covering Contact Messages & Inbox viewer (Explorer file + Terminal command), Guestbook entries, Project stars & visitor analytics, and Explorer custom files, folders, and VS Code Settings Sync.",
-  "updatedAt":  "2026-10-29T19:00:55.838354290Z",
-  "requestFeedback":  true,
-  "userFacing":  true
+  "summary": "Architectural plan for HR & Recruiter Readiness Improvements:\n- Prominent 'Download Resume' (PDF) buttons in both the Overview Hero and the Top Header Bar that open the hosted resume in a new tab.\n- Non-intrusive 'Recruiter Quick Tour' bar at the top with 1-click jumps to Selected Projects, Resume, and Contact.\n- Interactive in-app live iframe demo sandbox inside the Project Case Study Modal, with quick toggle between Case Study view and Interactive Live Demo.\n- Enhanced OpenGraph & SEO tags in index.html for professional rich share cards on LinkedIn, Twitter, and WhatsApp.",
+  "updatedAt": "2026-11-04T21:13:08.182501821Z",
+  "requestFeedback": true,
+  "userFacing": true
 }

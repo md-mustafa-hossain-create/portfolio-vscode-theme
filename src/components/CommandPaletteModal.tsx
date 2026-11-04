@@ -15,7 +15,6 @@ interface CommandPaletteModalProps {
   onSelectProject: (project: PortfolioProject) => void;
   onToggleTerminal: () => void;
   onToggleTheme: () => void;
-  onTriggerSync: () => void;
   onToggleSplitEditor: () => void;
   onToggleMinimap: () => void;
   onGoToLine: (line: number, col: number) => void;
@@ -43,7 +42,6 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
   onSelectProject,
   onToggleTerminal,
   onToggleTheme,
-  onTriggerSync,
   onToggleSplitEditor,
   onToggleMinimap,
   onGoToLine,
@@ -301,18 +299,6 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
           onClose();
         },
       },
-      {
-        id: 'act-sync',
-        title: '> Git: Sync / Synchronize Cloud Portfolio State',
-        subtitle: 'Trigger real-time state sync with backend storage API',
-        shortcut: 'Alt+S',
-        category: 'Commands',
-        icon: <Codicon name="sync" className="text-[#4EC9B0]" />,
-        onExecute: () => {
-          onTriggerSync();
-          onClose();
-        },
-      },
     ];
 
     const cleanQ = trimmed.replace(/^>\s*/, '').toLowerCase();
@@ -350,7 +336,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label="VS Code Command Center Quick Open"
-      className="fixed inset-0 z-50 flex items-start justify-center pt-9 px-4 bg-black/40"
+      className="fixed inset-0 z-50 flex items-start justify-center pt-8 sm:pt-9 px-2 sm:px-4 bg-black/50 safe-top"
       onClick={onClose}
     >
       <div
@@ -445,7 +431,7 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
                   type="button"
                   onMouseEnter={() => setSelectedIndex(idx)}
                   onClick={item.onExecute}
-                  className={`w-full flex items-center justify-between gap-4 px-3 py-1.5 text-left text-xs transition-none cursor-pointer ${
+                  className={`w-full min-h-[40px] md:min-h-0 flex items-center justify-between gap-4 px-3 py-2 md:py-1.5 text-left text-xs transition-none cursor-pointer ${
                     isSelected ? 'bg-[#04395E] text-white' : 'text-[#CCCCCC] hover:bg-[#2A2D2E]'
                   }`}
                 >

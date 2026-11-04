@@ -1,0 +1,75 @@
+{
+  "entities": {
+    "ContactMessage": {
+      "title": "ContactMessage",
+      "description": "A private contact inquiry submitted through the portfolio contact page or terminal CLI, strictly visible only to the verified website owner.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Sender full name or organization.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Sender reply-to email address.",
+          "minLength": 3,
+          "maxLength": 254,
+          "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"
+        },
+        "message": {
+          "type": "string",
+          "description": "Inquiry message body.",
+          "minLength": 1,
+          "maxLength": 5000
+        },
+        "source": {
+          "type": "string",
+          "description": "Submission origin channel.",
+          "enum": ["form", "terminal"],
+          "minLength": 4,
+          "maxLength": 10
+        },
+        "read": {
+          "type": "boolean",
+          "description": "Whether the website owner has marked the inquiry as read."
+        },
+        "recipientEmail": {
+          "type": "string",
+          "format": "email",
+          "description": "Immutable owner email address that owns this inbox item.",
+          "minLength": 26,
+          "maxLength": 26,
+          "pattern": "^hussainmustafa2001@gmail\\.com$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Immutable server timestamp when the inquiry was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the owner updated the read status."
+        }
+      },
+      "required": [
+        "name",
+        "email",
+        "message",
+        "source",
+        "read",
+        "recipientEmail",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/messages/{messageId}": {
+      "schema": "ContactMessage",
+      "description": "Private portfolio contact messages collection. Anyone can create a valid inquiry, but ONLY the verified website owner (hussainmustafa2001@gmail.com) can read, list, update read status, or delete messages."
+    }
+  }
+}

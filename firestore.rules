@@ -1,0 +1,102 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Hardened Global Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Only the verified portfolio owner (MD Mustafa Hossain) can read, list, update, or delete messages
+    function isPortfolioOwner() {
+      return isSignedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email == 'hussainmustafa2001@gmail.com';
+    }
+
+    // Validation Blueprint for ContactMessage (synchronized with firebase-blueprint.json)
+    function isValidContactMessage(data) {
+      return data.name is string
+        && data.name.size() >= 1
+        && data.name.size() <= 100
+        && data.email is string
+        && data.email.size() >= 3
+        && data.email.size() <= 254
+        && data.email.matches('^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$')
+        && data.message is string
+        && data.message.size() >= 1
+        && data.message.size() <= 5000
+        && data.source is string
+        && data.source.size() >= 4
+        && data.source.size() <= 10
+        && (data.source == 'form' || data.source == 'terminal')
+        && data.read is bool
+        && data.recipientEmail is string
+        && data.recipientEmail.size() == 26
+        && data.recipientEmail.matches('^hussainmustafa2001@gmail\\.com$')
+        && data.createdAt is timestamp;
+    }
+
+    function isToggleReadAction() {
+      return incoming().keys().hasAll(['name', 'email', 'message', 'source', 'read', 'recipientEmail', 'createdAt', 'updatedAt'])
+        && incoming().keys().hasOnly(['name', 'email', 'message', 'source', 'read', 'recipientEmail', 'createdAt', 'updatedAt'])
+        && incoming().diff(existing()).affectedKeys().hasOnly(['read', 'updatedAt'])
+        && incoming().name == existing().name
+        && incoming().email == existing().email
+        && incoming().message == existing().message
+        && incoming().source == existing().source
+        && incoming().recipientEmail == existing().recipientEmail
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt is timestamp
+        && incoming().updatedAt == request.time;
+    }
+
+    // 3. Collection Rules: /messages/{messageId}
+    match /messages/{messageId} {
+      // Strictly restricted to the verified website owner
+      allow get: if isPortfolioOwner()
+        && isValidId(messageId)
+        && existing().recipientEmail == request.auth.token.email;
+
+      allow list: if isPortfolioOwner()
+        && existing().recipientEmail == request.auth.token.email;
+
+      // Any portfolio visitor may submit a new contact inquiry with strict schema & timestamp validation
+      allow create: if isValidId(messageId)
+        && isValidContactMessage(incoming())
+        && incoming().keys().hasAll(['name', 'email', 'message', 'source', 'read', 'recipientEmail', 'createdAt'])
+        && incoming().keys().hasOnly(['name', 'email', 'message', 'source', 'read', 'recipientEmail', 'createdAt'])
+        && incoming().read == false
+        && incoming().createdAt == request.time;
+
+      // Only the verified website owner can mark a message as read/unread
+      allow update: if isValidContactMessage(incoming())
+        && isPortfolioOwner()
+        && isValidId(messageId)
+        && existing().recipientEmail == request.auth.token.email
+        && isToggleReadAction();
+
+      // Only the verified website owner can delete a message
+      allow delete: if isPortfolioOwner()
+        && isValidId(messageId)
+        && existing().recipientEmail == request.auth.token.email;
+    }
+  }
+}

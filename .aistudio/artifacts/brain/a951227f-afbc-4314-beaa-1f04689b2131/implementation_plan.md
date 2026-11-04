@@ -1,109 +1,102 @@
-# Full-Stack Persistent Backend & Cloud Sync for MUSTAFA.dev VS Code Portfolio
+# HR & Hiring Team Readiness: Recruiter Quick Tour, Resume CTAs, Live Sandbox & OpenGraph SEO
 
-Upgrade the `MUSTAFA.dev` Visual Studio Code portfolio workbench with a complete, zero-setup Node/Express persistent backend and live Server-Sent Events (SSE) synchronization for contact messages, inbox viewing, guestbook endorsements, project stars & visitor counters, custom Explorer files/folders, and VS Code Settings Sync.
+This plan outlines the design and architectural updates to make **`MUSTAFA.dev`** instantly accessible, frictionless, and impressive for HR managers, non-technical recruiters, and engineering hiring leads.
 
-## User Review & Critical Decisions
+---
+
+### User Review & Critical Decisions
 
 > [!IMPORTANT]
-> All backend architecture and persistence choices below reflect your confirmed preferences from the clarification step and require zero external API keys or third-party cloud provisioning.
-
-- **Confirmed Decision 1 (Storage Engine)**: Built-in Node Express server + persistent local disk store (`.data/portfolio-cloud-store.json` with atomic write-through and automatic initialization) running on port 3000 alongside the Vite application.
-- **Confirmed Decision 2 (Persisted Features)**:
-  1. **Contact Form Messages & Guestbook Endorsements**: Validated, timestamped, and broadcast in real time to all connected clients.
-  2. **Project Star Ratings & Visitor Counters**: Persistent per-project star counts (`StreamPulse`, `DevDock`, `GeoLearn`) plus total portfolio visitor/session telemetry.
-  3. **Explorer Custom Files, Folders & VS Code Settings Sync**: User-created files (`New File...`), custom folders (`New Folder...`), custom file edits, and workbench `settings.json` preferences (`theme`, `fontSize`, `minimapEnabled`, `wordWrap`, `lineNumbers`, `autoSave`) persisted on the backend and restored across sessions.
-- **Confirmed Decision 3 (Inbox Access)**: Incoming contact messages are accessible directly inside the VS Code workbench via:
-  - A live `messages-inbox.json` file in the Explorer (`config/messages-inbox.json`) that renders an interactive Inbox & Message Inspector view in the editor.
-  - A built-in `inbox` / `messages` command in the Integrated Terminal (`Ctrl+\``) to list, inspect, or mark incoming contact inquiries as read.
+> The following choices were confirmed in Phase 1:
+> - **Primary Features Selected**:
+>   1. Prominent Resume Download action in both the Hero section and Top Header.
+>   2. Recruiter Quick Tour top banner for non-technical recruiters.
+>   3. Interactive in-app live iframe demo sandbox for projects.
+>   4. Enhanced OpenGraph & SEO meta tags for LinkedIn, Twitter, and messaging platforms.
+> - **Resume Click Behavior**: Opens the hosted resume PDF directly in a new tab (`target="_blank" rel="noopener noreferrer"`), ensuring recruiters can view and save it without leaving the portfolio workspace.
 
 ---
 
-## 1. Overview & Core Concept
+### 1. Overview & Core Concept
 
-- **What It Does**: Transforms the VS Code portfolio into a full-stack persistent application where every visitor interaction—sending a contact message, signing the developer guestbook, starring a project, creating/editing custom files or folders in the Explorer, or changing VS Code workbench settings—is saved to the server and synchronized in real time across tabs.
-- **Target Audience / Persona**: Recruiters, engineering managers, and fellow developers visiting MD Mustafa Hossain's portfolio (`MUSTAFA.dev`), as well as Mustafa himself inspecting incoming inquiries via the Explorer or Integrated Terminal.
-- **Key Value**: Zero-configuration reliability with authentic IDE ergonomics—visitors experience a genuinely stateful developer environment, and Mustafa can read and manage contact submissions directly from the Explorer tree or Terminal CLI.
-
----
-
-## 2. User Experience & Visual Design
-
-- **Key User Flows**:
-  1. **Contact Dispatch & Live Inbox Inspection**: When a visitor submits a message on `contact.tsx` or via `contact --send` in the Terminal, the backend validates and stores the inquiry, increments the unread badge, broadcasts an SSE event, and updates `config/messages-inbox.json` in the Explorer and the `inbox` Terminal command output.
-  2. **Explorer File/Folder Persistence**: Creating a file (`New File...`), editing its code buffer in the editor, or creating a folder (`New Folder...`) automatically syncs to the Express backend (`PUT /api/workspace/files` and `POST /api/workspace/folders`) so custom workspace artifacts persist across page reloads.
-  3. **VS Code Settings Sync**: Updating preferences in the graphical Settings UI (`Ctrl+,` or `config/settings.json`) persists to `PUT /api/settings` and logs the cloud sync revision in the Status Bar and Output panel.
-  4. **Project Endorsements & Visitor Telemetry**: Starring `StreamPulse`, `DevDock`, or `GeoLearn` or visiting the portfolio increments persistent counters on the backend and updates all open sessions via SSE.
-- **Visual Identity & Theme**:
-  - *Aesthetic Direction*: Authentic Visual Studio Code Dark Modern (`#181818` chrome, `#1F1F1F` editor canvas, `#252526` floating widgets, `#0078D4` focus borders) and Light Modern dual-theme support.
-  - *Typography & Hierarchy*: Clean UI sans-serif for workbench chrome and editorial cards paired with monospace (`JetBrains Mono` / `Fira Code`) with `tabular-nums` for line numbers, timestamps, and metrics.
-  - *Interactive Feedback*: Status bar sync spinner (`sync~spin` Codicon), toast notifications in the bottom-right notification center, and real-time Output channel logs.
+- **What It Does**:
+  - Equips the portfolio with recruiter-first affordances: a prominent 1-click **"Download Resume (PDF)"** action, a dismissible **"Recruiter Quick Tour"** bar linking directly to key evaluation areas, an embedded **Live Demo Sandbox** tab inside project modals, and rich **Social Preview Cards** for LinkedIn/Twitter shares.
+- **Target Audience / Persona**:
+  - HR talent acquisition leads, technical recruiters, hiring managers, and senior engineers who have 30–60 seconds to evaluate Mustafa's skills, credentials, projects, and contact avenues.
+- **Key Value**:
+  - Eliminates hunting for resumes or getting lost in technical IDE keybindings, while preserving 100% of the authentic Visual Studio Code developer aesthetics.
 
 ---
 
-## 3. Key Product Decisions & Trade-Offs
+### 2. User Experience & Visual Design
 
-- **Decision 1: Atomic JSON Disk Store with Real-Time SSE Broadcast**
-  - *Chosen Approach*: Express REST endpoints paired with an atomic file store (`.data/portfolio-cloud-store.json`) and a live `/api/stream` Server-Sent Events channel.
-  - *Why*: Requires zero external credentials, survives server restarts, works out-of-the-box in both development and production builds, and pushes instant delta updates to connected clients.
-- **Decision 2: Dual Workbench Inbox (Explorer File + Terminal CLI)**
-  - *Chosen Approach*: Expose stored contact messages both as a clickable `messages-inbox.json` file inside the Explorer's `config/` folder and via the `inbox` command in the Integrated Terminal.
-  - *Why*: Fits naturally into the VS Code mental model—users can inspect inquiries visually in the editor or query them from the command line.
+#### A. Recruiter Quick Tour Bar
+- Positioned quietly just beneath the top window title bar:
+  - Clean unboxed prompt: `HR & Recruiter Quick Actions:`
+  - Three 1-click action buttons:
+    1. `📄 View Resume (PDF)` → Opens Mustafa's resume PDF in a new tab.
+    2. `🚀 See Projects (3)` → Smoothly opens `projects.tsx` and highlights selected work.
+    3. `✉️ Get in Touch` → Opens `contact.tsx` direct message form.
+  - Quiet dismiss button (`✕`) so technical users can close it with state remembered in localStorage.
+
+#### B. Prominent Resume CTAs
+- **Hero CTA Row (`overview.tsx`)**:
+  - Add an eye-catching primary button: `<a href={DEVELOPER_PROFILE.resumeUrl} target="_blank" ...>📄 Download Resume (PDF)</a>` styled with high-contrast `#0078D4` blue and hover lift.
+- **Top Window Header Bar (`App.tsx`)**:
+  - Add a dedicated `Resume (PDF)` action next to the layout controls so recruiters can access it at any point from any file or view.
+
+#### C. In-App Interactive Demo Sandbox (`ProjectCaseStudyModal.tsx`)
+- Inside the Project Modal, add a clean segmented mode toggle:
+  - `[ Architecture & Code ]` (Current case study with metrics, challenge, solution, and code spotlight).
+  - `[ Live Interactive Demo ]` (Embeds an authentic interactive `<iframe>` sandbox of `streampulse-mustafa.web.app`, `devdock-mustafa.web.app`, or `geolearn-mustafa.web.app` with fullscreen toggle and "Open in new window" button).
+  - Includes a loading spinner and fallback notice in case iframe framing is blocked on external networks.
+
+#### D. Enhanced OpenGraph & SEO Social Sharing Cards (`index.html`)
+- Complete meta tags for rich social cards:
+  - `og:image`: Verified high-resolution preview image.
+  - `og:title`: `MD Mustafa Hossain — Frontend React Developer | MUSTAFA.dev`
+  - `og:description`: `BCA Graduate & Frontend Developer specializing in React 19, TypeScript, and Tailwind CSS. Explore live projects, case studies, and resume.`
+  - `twitter:image`, `twitter:creator`: `@MDMustafaHussa7`.
+  - JSON-LD Structured Data (`Person` schema with role, alma mater, and portfolio links).
 
 ---
 
-## 4. Technical Architecture & Data Strategy *(Technical Reference)*
+### 3. Key Product Decisions & Trade-Offs
 
-### Architecture & Component Diagram
+- **Decision 1: Direct Hosted PDF vs. Static Mock**:
+  - *Approach*: Link directly to `DEVELOPER_PROFILE.resumeUrl` (`https://mustafa-dev-portfolio.web.app/resume.pdf`) with fallback copy and download attribute.
+  - *Why*: HR platforms require real verifiable PDF resumes; opening in a new tab ensures recruiters can print, download, or bookmark it immediately.
+- **Decision 2: Modal Sandbox vs. External Redirect**:
+  - *Approach*: Allow recruiters to toggle between reading the architectural case study and playing with the live working app in an embedded sandbox inside the modal.
+  - *Why*: Keeps recruiters inside the portfolio experience without forcing them into unfamiliar external tabs, drastically reducing bounce rate.
+
+---
+
+### 4. Technical Architecture & System Flow
 
 ```
-┌────────────────────────────────────────────────────────────────────────────┐
-│                   VS Code Portfolio Workbench (React SPA)                  │
-├──────────────────────┬───────────────────────────┬─────────────────────────┤
-│   Activity & Side    │   Multi-Mode Editor       │   Integrated Terminal   │
-│   Bar (Explorer)     │   Groups (Hybrid/Split)   │   & Output Panel        │
-│  ┌────────────────┐  │  ┌─────────────────────┐  │  ┌───────────────────┐  │
-│  │ src/pages/*    │  │  │ Contact & Guestbook │  │  │ `inbox` CLI cmd   │  │
-│  │ Custom Files   │  │  │ Messages Inbox View │  │  │ `contact` CLI cmd │  │
-│  │ Custom Folders │  │  │ Project Case Studies│  │  │ `sync` CLI cmd    │  │
-│  │ messages-inbox │  │  │ Settings UI Editor  │  │  │ Live SSE Logs     │  │
-│  └───────┬────────┘  └──┴──────────┬──────────┘  └──┴─────────┬─────────┘  │
-└──────────┼─────────────────────────┼──────────────────────────┼────────────┘
-           │ REST Mutations          │ Fetch / Sync             │ SSE Stream
-           ▼                         ▼                          ▼
-┌────────────────────────────────────────────────────────────────────────────┐
-│                     Express Backend Server (:3000)                         │
-│  • GET  /api/portfolio         (Full state: stars, guestbook, files, etc.) │
-│  • GET  /api/stream            (Live SSE broadcast to connected clients)   │
-│  • POST /api/messages          (Validate & save contact inquiry)           │
-│  • GET  /api/messages          (Retrieve contact inquiries for Inbox)      │
-│  • DELETE /api/messages/:id    (Delete / archive an inquiry)               │
-│  • POST /api/guestbook         (Save developer guestbook endorsement)      │
-│  • POST /api/projects/:id/star (Increment persistent project star count)   │
-│  • PUT  /api/workspace         (Persist custom files, folders & settings)  │
-│  • POST /api/sync              (Manual cloud sync & visitor counter)       │
-├────────────────────────────────────────────────────────────────────────────┤
-│               Persistent Local Store (.data/portfolio-cloud-store.json)    │
-└────────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                        Top Window Title Bar                            │
+│  [MUSTAFA.dev] [Search Files]  [📄 Resume PDF] [Sidebar] [Terminal]   │
+├────────────────────────────────────────────────────────────────────────┤
+│  Recruiter Quick Tour Bar:  [📄 Resume]  [🚀 Projects]  [✉️ Contact] ✕ │
+├──────────┬─────────────────────────────────────────────────────────────┤
+│ Activity │ Editor Workspace & Tabs                                      │
+│   Bar    │ ┌─────────────────────────────────────────────────────────┐ │
+│          │ │ overview.tsx                                            │ │
+│ Explorer │ │ Hero CTA: [See Work] [📄 Download Resume] [Contact]     │ │
+│ Search   │ └─────────────────────────────────────────────────────────┘ │
+│ Ext      │                                                             │
+│ Gemini   │ Project Modal:                                              │
+│          │ ┌─────────────────────────────────────────────────────────┐ │
+│          │ │ Mode: (•) Case Study  ( ) Live Sandbox Demo ↗           │ │
+│          │ │ [ Interactive iframe: streampulse-mustafa.web.app ]     │ │
+│          │ └─────────────────────────────────────────────────────────┘ │
+└──────────┴─────────────────────────────────────────────────────────────┘
 ```
 
-### Data Model & State
-
-- **`CloudStoreData`**:
-  - `projectStars`: `Record<string, number>` — star counts per project ID.
-  - `visitorCount`: `number` — total portfolio sessions/visits tracked.
-  - `messages`: `ContactMessage[]` — `{ id, name, email, message, createdAt, source, read }`.
-  - `guestbook`: `GuestbookEntry[]` — `{ id, author, role, comment, createdAt }`.
-  - `customFiles`: `Record<string, string>` — user-created Explorer file names mapped to their source code content.
-  - `customFolders`: `string[]` — user-created Explorer folder paths under `src/`.
-  - `settings`: `Partial<WorkbenchSettings>` — persisted VS Code workbench settings.
-  - `syncCount`, `lastSyncedAt`, `totalCommandsExecuted`: cloud sync revision metadata.
-
-### Interactive Component & State Mapping
-
-- **Explorer (`src/App.tsx`)**:
-  - Creating/deleting custom files or folders dispatches `PUT /api/workspace` to persist the updated tree on the backend.
-  - Clicking `config/messages-inbox.json` opens the interactive Inbox view showing all stored `ContactMessage` items with search, read/unread toggle, and delete actions.
-- **Editor Views (`src/components/WorkspaceViews.tsx`)**:
-  - Renders the `messages-inbox.json` graphical + JSON inspector when `activeFile === 'messages-inbox.json'`, allowing one-click reply (`mailto:`), mark-as-read, or deletion synced with `/api/messages`.
-- **Terminal Panel (`src/components/TerminalPanel.tsx`)**:
-  - Adds the `inbox` (and `messages`) CLI command to display all persisted contact messages in a formatted table directly inside the VS Code terminal, plus `inbox clear` / `contact <name> | <email> | <msg>` support.
+- **Files to update**:
+  1. `index.html`: Enhanced OpenGraph, Twitter Cards, Schema.org JSON-LD.
+  2. `src/App.tsx`: Recruiter Quick Tour bar and Top Bar Resume button.
+  3. `src/components/WorkspaceViews.tsx`: Hero `Download Resume (PDF)` button in `overview.tsx`.
+  4. `src/components/ProjectCaseStudyModal.tsx`: Segmented tab switch for Case Study vs. Live Interactive Sandbox iframe.

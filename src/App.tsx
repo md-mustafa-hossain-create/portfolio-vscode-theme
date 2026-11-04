@@ -4,6 +4,7 @@ import {
   OfficialVSCodeLogo,
   SetiFileIcon,
   OfficialSkillIcon,
+  OfficialGeminiLogo,
 } from './components/OfficialIcons';
 import {
   DEVELOPER_PROFILE,
@@ -17,7 +18,6 @@ import {
 } from './data/portfolioData';
 import {
   WorkspaceViews,
-  GuestbookEntry,
   ContactMessage,
   WorkbenchSettings,
 } from './components/WorkspaceViews';
@@ -25,19 +25,47 @@ import { TerminalPanel, BottomPanelTab } from './components/TerminalPanel';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { ProjectCaseStudyModal } from './components/ProjectCaseStudyModal';
 import { SourceCodeView } from './components/SourceCodeView';
+import { GeminiChatPanel } from './components/GeminiChatPanel';
+import { PWAInstallButton } from './components/PWAInstallButton';
+import { MobileTouchBar } from './components/MobileTouchBar';
+import { OSSwitcherModal } from './components/OSSwitcherModal';
+import {
+  OSPlatform,
+  detectNativeOS,
+  formatShortcut,
+  OS_META,
+} from './utils/platform';
+import {
+  auth,
+  onAuthStateChanged,
+  User,
+  isVerifiedOwnerUser,
+  signInAsPortfolioOwner,
+  signOutPortfolioOwner,
+  subscribeToOwnerMessages,
+} from './firebase';
 
-type ActivityViewId = 'explorer' | 'search' | 'scm' | 'debug' | 'extensions';
+type ActivityViewId = 'explorer' | 'search' | 'extensions' | 'gemini';
 type EditorViewMode = 'hybrid' | 'code' | 'split';
-type MenuId =
-  | 'File'
-  | 'Edit'
-  | 'Selection'
-  | 'View'
-  | 'Go'
-  | 'Run'
-  | 'Terminal'
-  | 'Help'
-  | null;
+type MenuId = 'File' | 'View' | 'Go' | 'Terminal' | 'Help' | null;
+
+function getOrCreateVisitorId(): string {
+  const storageKey = 'mustafa_unique_visitor_id';
+  try {
+    const existing = localStorage.getItem(storageKey);
+    if (existing && existing.trim().length >= 8) {
+      return existing.trim();
+    }
+    const generated =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `vis-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+    localStorage.setItem(storageKey, generated);
+    return generated;
+  } catch {
+    return 'fallback-browser-visitor';
+  }
+}
 
 export default function App() {
   const [activeFile, setActiveFile] = useState<string>('overview.tsx');
@@ -78,12 +106,54 @@ export default function App() {
   );
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState<boolean>(false);
   const [editorMode, setEditorMode] = useState<EditorViewMode>('hybrid');
+  const [recruiterTourDismissed, setRecruiterTourDismissed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('mustafa_recruiter_tour_dismissed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // Cross-Platform OS & Touch State (Windows, macOS, Linux, Android, iOS)
+  const [activeOS, setActiveOS] = useState<OSPlatform>(() => {
+    try {
+      const saved = localStorage.getItem('mustafa_os_override') as OSPlatform;
+      if (saved && ['macos', 'windows', 'linux', 'android', 'ios'].includes(saved)) {
+        return saved;
+      }
+    } catch {
+      // ignore
+    }
+    return detectNativeOS();
+  });
+  const [isAutoOS, setIsAutoOS] = useState<boolean>(() => {
+    try {
+      return !localStorage.getItem('mustafa_os_override');
+    } catch {
+      return true;
+    }
+  });
+  const [osModalOpen, setOSModalOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState(() =>
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
+
+  const handleSelectOS = (selected: OSPlatform, isAuto: boolean) => {
+    setActiveOS(selected);
+    setIsAutoOS(isAuto);
+    try {
+      if (isAuto) {
+        localStorage.removeItem('mustafa_os_override');
+      } else {
+        localStorage.setItem('mustafa_os_override', selected);
+      }
+    } catch {
+      // storage error
+    }
+  };
 
   // Official Title Bar Dropdown Menu state
   const [openMenu, setOpenMenu] = useState<MenuId>(null);
-
-  // Interactive Breadcrumb Picker Dropdown state
-  const [breadcrumbDropdown, setBreadcrumbDropdown] = useState<'files' | 'symbols' | null>(null);
 
   // Official Editor Find Widget (Ctrl+F)
   const [findWidgetOpen, setFindWidgetOpen] = useState(false);
@@ -91,34 +161,12 @@ export default function App() {
   const [findMatchCase, setFindMatchCase] = useState(false);
   const [findWholeWord, setFindWholeWord] = useState(false);
 
-  // Official VS Code Debugger Session State (F5)
-  const [isDebugging, setIsDebugging] = useState(false);
-  const [watchExpressions, setWatchExpressions] = useState<
-    Array<{ expr: string; value: string }>
-  >([
-    { expr: 'MUSTAFA_PROFILE.cgpa', value: '9.09' },
-    { expr: 'SELECTED_PROJECTS.length', value: '3' },
-  ]);
-  const [addingWatch, setAddingWatch] = useState(false);
-  const [newWatchExpr, setNewWatchExpr] = useState('');
-
-  // Explorer collapsible tree sections & official VS Code Explorer state
-  const [openEditorsExpanded, setOpenEditorsExpanded] = useState(true);
+  // Explorer collapsible tree sections
   const [workspaceTreeExpanded, setWorkspaceTreeExpanded] = useState(true);
   const [srcRootExpanded, setSrcRootExpanded] = useState(true);
   const [srcFolderExpanded, setSrcFolderExpanded] = useState(true);
   const [projectsFolderExpanded, setProjectsFolderExpanded] = useState(true);
-  const [componentsFolderExpanded, setComponentsFolderExpanded] = useState(false);
-  const [publicFolderExpanded, setPublicFolderExpanded] = useState(false);
   const [configFolderExpanded, setConfigFolderExpanded] = useState(true);
-  const [outlineExpanded, setOutlineExpanded] = useState(true);
-  const [timelineExpanded, setTimelineExpanded] = useState(true);
-
-  // Explorer Views visibility (... menu in Explorer header)
-  const [explorerViewsMenuOpen, setExplorerViewsMenuOpen] = useState(false);
-  const [showOpenEditors, setShowOpenEditors] = useState(true);
-  const [showOutline, setShowOutline] = useState(true);
-  const [showTimeline, setShowTimeline] = useState(true);
 
   // Explorer New Folder & Filter on Type state
   const [customFolders, setCustomFolders] = useState<string[]>([]);
@@ -136,57 +184,18 @@ export default function App() {
     isCustom?: boolean;
   } | null>(null);
 
-  // Global sidebar Search & Replace state
+  // Global sidebar Search state
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
-  const [globalReplaceQuery, setGlobalReplaceQuery] = useState('');
-  const [searchReplaceExpanded, setSearchReplaceExpanded] = useState(false);
   const [matchCase, setMatchCase] = useState(false);
   const [matchWholeWord, setMatchWholeWord] = useState(false);
   const [useRegex, setUseRegex] = useState(false);
 
-  // Source Control Staged / Unstaged Changes & Branch
-  const [scmMessage, setScmMessage] = useState('');
-  const [stagedFiles, setStagedFiles] = useState<string[]>(['overview.tsx']);
-  const [gitBranch, setGitBranch] = useState<'main' | 'feat/vscode-ui' | 'release/v2.4.0'>('main');
-  const [commitHistory, setCommitHistory] = useState<
-    Array<{ hash: string; message: string; time: string }>
-  >([
-    {
-      hash: 'a8f94e2',
-      message: 'feat: official Devicon multi-color SVGs & VS Code Settings UI',
-      time: 'Just now',
-    },
-    {
-      hash: '7c31b09',
-      message: 'feat: integrate StreamPulse, DevDock & GeoLearn case studies',
-      time: '2h ago',
-    },
-  ]);
-
   // Extensions sidebar search state
   const [extensionSearchQuery, setExtensionSearchQuery] = useState('');
 
-  // Account, Settings, Notifications & About Modal popups
-  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  // Settings & About Modal popups
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [aboutModalOpen, setAboutModalOpen] = useState(false);
-  const [notifications, setNotifications] = useState<
-    Array<{ id: string; title: string; source: string; time: string }>
-  >([
-    {
-      id: 'notif-1',
-      title: 'MUSTAFA.dev Cloud Sync connected via SSE (/api/stream).',
-      source: 'Cloud Storage Extension',
-      time: 'Now',
-    },
-    {
-      id: 'notif-2',
-      title: 'All 9 official frontend & tooling extensions activated.',
-      source: 'Extensions Marketplace',
-      time: '1m ago',
-    },
-  ]);
 
   // Bottom Panel state
   const [terminalOpen, setTerminalOpen] = useState<boolean>(true);
@@ -198,55 +207,16 @@ export default function App() {
   const [palettePrefix, setPalettePrefix] = useState<string>('');
   const [selectedProject, setSelectedProject] = useState<PortfolioProject | null>(null);
 
-  // Status Bar cursor, indentation, EOL & sync spinner telemetry
+  // Editor cursor position
   const [cursorPos, setCursorPos] = useState<{ line: number; col: number }>({ line: 5, col: 14 });
-  const [indentSpaces, setIndentSpaces] = useState<2 | 4>(2);
-  const [eolMode, setEolMode] = useState<'LF' | 'CRLF'>('LF');
-  const [isSyncingNow, setIsSyncingNow] = useState<boolean>(false);
 
-  // Real-time synchronized state from backend cloud API
+  // Real-time synchronized state from backend API & Owner-Only Firebase Firestore
   const [projects, setProjects] = useState<PortfolioProject[]>(INITIAL_PROJECTS);
-  const [visitorCount, setVisitorCount] = useState<number>(412);
-  const [messages, setMessages] = useState<ContactMessage[]>([
-    {
-      id: 'msg-seed-1',
-      name: 'Sourav Mukherjee',
-      email: 'sourav.mukherjee@techcorp.in',
-      subject: 'Frontend Engineer Role — React & TypeScript',
-      message:
-        'Hi Mustafa, we reviewed your StreamPulse and DevDock architectures and were impressed by your 9.09 CGPA at Brainware University. Let us connect for a frontend interview!',
-      createdAt: '2026-10-24T09:30:00.000Z',
-      source: 'form',
-      read: false,
-    },
-  ]);
-  const [guestbook, setGuestbook] = useState<GuestbookEntry[]>([
-    {
-      id: 'gb-1',
-      author: 'Arindam Chatterjee',
-      role: 'Senior Frontend Engineer · Kolkata',
-      comment:
-        'Impressive Web Audio API visualizer architecture on StreamPulse — zero frame drops even during route transitions.',
-      createdAt: '2026-10-14T10:30:00.000Z',
-    },
-    {
-      id: 'gb-2',
-      author: 'Priya Nair',
-      role: 'Product Designer · Bengaluru',
-      comment:
-        'DevDock drag-and-drop workspace feels super snappy on mobile browsers. Clean attention to UI detail!',
-      createdAt: '2026-10-21T14:15:00.000Z',
-    },
-  ]);
-  const [syncStats, setSyncStats] = useState({
-    syncCount: 128,
-    lastSyncedAt: new Date().toISOString(),
-    totalCommandsExecuted: 342,
-  });
-  const [syncLogs, setSyncLogs] = useState<string[]>([
-    `[${new Date().toLocaleTimeString()}] [info] Connected to MUSTAFA.dev Cloud Sync SSE stream (/api/stream)`,
-    `[${new Date().toLocaleTimeString()}] [info] Loaded 3 production case studies (StreamPulse, DevDock, GeoLearn) and 9 core stack extensions`,
-  ]);
+  const [visitorCount, setVisitorCount] = useState<number>(0);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState<boolean>(false);
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
+  const isOwner = isVerifiedOwnerUser(currentUser);
 
   const theme = settings.theme;
   const minimapVisible = settings.minimapEnabled;
@@ -292,9 +262,24 @@ export default function App() {
     }
   }, [theme]);
 
-  const appendSyncLog = useCallback((msg: string) => {
-    const time = new Date().toLocaleTimeString();
-    setSyncLogs((prev) => [`[${time}] ${msg}`, ...prev.slice(0, 39)]);
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        setMobileDrawerOpen(false);
+      }
+    };
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('resize', handleResize);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
   const applyProjectStars = useCallback((starMap: Record<string, number>) => {
@@ -312,16 +297,56 @@ export default function App() {
     );
   }, []);
 
+  // Track Firebase Authentication state
+  useEffect(() => {
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setAuthReady(true);
+      if (!isVerifiedOwnerUser(user)) {
+        setMessages([]);
+      }
+    });
+    return () => unsubAuth();
+  }, []);
+
+  // Only subscribe to Firestore /messages when the verified website owner is authenticated
+  useEffect(() => {
+    if (!authReady || !isOwner) {
+      setMessages([]);
+      return;
+    }
+    const unsubMessages = subscribeToOwnerMessages((firestoreMsgs) => {
+      setMessages(firestoreMsgs);
+    });
+    return () => unsubMessages();
+  }, [authReady, isOwner]);
+
+  const handleOwnerSignIn = useCallback(async () => {
+    try {
+      await signInAsPortfolioOwner();
+    } catch {
+      // Popup closed by user
+    }
+  }, []);
+
+  const handleOwnerSignOut = useCallback(async () => {
+    try {
+      await signOutPortfolioOwner();
+      setMessages([]);
+    } catch {
+      // Ignore signout error
+    }
+  }, []);
+
   useEffect(() => {
     let eventSource: EventSource | null = null;
+    const visitorId = getOrCreateVisitorId();
 
     fetch('/api/portfolio')
       .then((res) => res.json())
       .then((data) => {
         if (data.projectStars) applyProjectStars(data.projectStars);
         if (typeof data.visitorCount === 'number') setVisitorCount(data.visitorCount);
-        if (Array.isArray(data.messages)) setMessages(data.messages);
-        if (Array.isArray(data.guestbook)) setGuestbook(data.guestbook);
         if (data.customFiles && typeof data.customFiles === 'object') {
           setCustomFiles(data.customFiles);
         }
@@ -331,32 +356,22 @@ export default function App() {
         if (data.settings && typeof data.settings === 'object') {
           setSettings((prev) => ({ ...prev, ...data.settings }));
         }
-        if (typeof data.syncCount === 'number') {
-          setSyncStats({
-            syncCount: data.syncCount,
-            lastSyncedAt: data.lastSyncedAt || new Date().toISOString(),
-            totalCommandsExecuted: data.totalCommandsExecuted || 342,
-          });
-        }
       })
       .catch(() => {
         // Offline resilient fallback
       });
 
-    // Increment visitor counter once per browser session
-    try {
-      if (!sessionStorage.getItem('mustafa_visited')) {
-        sessionStorage.setItem('mustafa_visited', '1');
-        fetch('/api/visit', { method: 'POST' })
-          .then((r) => r.json())
-          .then((d) => {
-            if (typeof d.visitorCount === 'number') setVisitorCount(d.visitorCount);
-          })
-          .catch(() => {});
-      }
-    } catch {
-      // Ignore storage restrictions
-    }
+    // Register unique visitor with persistent client visitorId (deduplicated on server)
+    fetch('/api/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ visitorId }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (typeof d.visitorCount === 'number') setVisitorCount(d.visitorCount);
+      })
+      .catch(() => {});
 
     try {
       eventSource = new EventSource('/api/stream');
@@ -365,23 +380,11 @@ export default function App() {
           const payload = JSON.parse(event.data);
           if (payload.projectStars) applyProjectStars(payload.projectStars);
           if (typeof payload.visitorCount === 'number') setVisitorCount(payload.visitorCount);
-          if (Array.isArray(payload.messages)) setMessages(payload.messages);
-          if (Array.isArray(payload.guestbook)) setGuestbook(payload.guestbook);
           if (payload.customFiles && typeof payload.customFiles === 'object') {
             setCustomFiles(payload.customFiles);
           }
           if (Array.isArray(payload.customFolders)) {
             setCustomFolders(payload.customFolders);
-          }
-          if (typeof payload.syncCount === 'number') {
-            setSyncStats({
-              syncCount: payload.syncCount,
-              lastSyncedAt: payload.lastSyncedAt || new Date().toISOString(),
-              totalCommandsExecuted: payload.totalCommandsExecuted || 342,
-            });
-          }
-          if (payload.type && payload.type !== 'connected') {
-            appendSyncLog(`[SSE] Event "${payload.type}" — Cloud Revision #${payload.syncCount}`);
           }
         } catch {
           // Ignore malformed event
@@ -394,7 +397,7 @@ export default function App() {
     return () => {
       eventSource?.close();
     };
-  }, [applyProjectStars, appendSyncLog]);
+  }, [applyProjectStars]);
 
   const handleOpenFile = useCallback(
     (fileId: string, pushHistory = true) => {
@@ -405,7 +408,6 @@ export default function App() {
         setSidebarOpen(false);
       }
       setOpenMenu(null);
-      setBreadcrumbDropdown(null);
       if (pushHistory) {
         setNavHistory((prev) => {
           const sliced = prev.slice(0, navHistoryIdx + 1);
@@ -475,8 +477,6 @@ export default function App() {
     setSrcRootExpanded(false);
     setSrcFolderExpanded(false);
     setProjectsFolderExpanded(false);
-    setComponentsFolderExpanded(false);
-    setPublicFolderExpanded(false);
     setConfigFolderExpanded(false);
   };
 
@@ -489,53 +489,24 @@ export default function App() {
         persistWorkspaceToCloud(undefined, next, undefined);
         return next;
       });
-      appendSyncLog(`[Explorer] Created folder "src/${clean}"`);
     },
-    [appendSyncLog, persistWorkspaceToCloud]
+    [persistWorkspaceToCloud]
   );
 
   const handleStarProject = async (projectId: string) => {
     try {
+      const visitorId = getOrCreateVisitorId();
       const res = await fetch(`/api/projects/${projectId}/star`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visitorId }),
       });
       const data = await res.json();
       if (res.ok && data.projectStars) {
         applyProjectStars(data.projectStars);
-        appendSyncLog(`[Git/Cloud] Endorsed project "${projectId}"`);
       }
     } catch {
-      setProjects((prev) =>
-        prev.map((p) => (p.id === projectId ? { ...p, stars: p.stars + 1 } : p))
-      );
-    }
-  };
-
-  const handleTriggerSync = async (fromTerminal = false) => {
-    setIsSyncingNow(true);
-    try {
-      const res = await fetch('/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fromTerminal }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setSyncStats({
-          syncCount: data.syncCount,
-          lastSyncedAt: data.lastSyncedAt,
-          totalCommandsExecuted: data.totalCommandsExecuted,
-        });
-        appendSyncLog(`[Sync] Synchronized workspace state — Revision #${data.syncCount}`);
-      }
-    } catch {
-      setSyncStats((prev) => ({
-        ...prev,
-        syncCount: prev.syncCount + 1,
-        lastSyncedAt: new Date().toISOString(),
-      }));
-    } finally {
-      setTimeout(() => setIsSyncingNow(false), 500);
+      // Offline resilient fallback
     }
   };
 
@@ -587,10 +558,7 @@ export default function App() {
       } else if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
         e.preventDefault();
         setEditorMode((prev) => (prev === 'split' ? 'hybrid' : 'split'));
-      } else if (e.key === 'F5') {
-        e.preventDefault();
-        setIsDebugging((prev) => !prev);
-      } else if (e.altKey && ['1', '2', '3', '4', '5', '6', '7', '8'].includes(e.key)) {
+      } else if (e.altKey && ['1', '2', '3', '4', '5', '6', '7'].includes(e.key)) {
         e.preventDefault();
         const index = parseInt(e.key, 10) - 1;
         if (WORKSPACE_FILES[index]) {
@@ -693,7 +661,7 @@ export default function App() {
         fileId: 'overview.tsx',
         fileName: 'src/pages/overview.tsx',
         line: 8,
-        snippet: `${DEVELOPER_PROFILE.name} — ${DEVELOPER_PROFILE.educationShort}`,
+        snippet: `${DEVELOPER_PROFILE.name} — ${DEVELOPER_PROFILE.title} (${DEVELOPER_PROFILE.roleSubtitle})`,
       });
     }
 
@@ -822,6 +790,12 @@ export default function App() {
         action: () => handleOpenFile('contact.tsx'),
       },
       {
+        label: 'Open Owner Inbox (messages-inbox.json)',
+        shortcut: 'Alt+7',
+        dividerAfter: true,
+        action: () => handleOpenFile('messages-inbox.json'),
+      },
+      {
         label: 'Preferences: Settings',
         shortcut: 'Ctrl+,',
         action: () => handleOpenFile('settings'),
@@ -833,14 +807,6 @@ export default function App() {
         action: () => {
           setActivityView('extensions');
           setSidebarOpen(true);
-          setOpenMenu(null);
-        },
-      },
-      {
-        label: 'Save & Sync Cloud State',
-        shortcut: 'Ctrl+S',
-        action: () => {
-          handleTriggerSync(false);
           setOpenMenu(null);
         },
       },
@@ -860,65 +826,6 @@ export default function App() {
         shortcut: 'Ctrl+W',
         action: () => {
           handleCloseTab(null, activeFile);
-          setOpenMenu(null);
-        },
-      },
-    ],
-    Edit: [
-      {
-        label: 'Find in Active File',
-        shortcut: 'Ctrl+F',
-        action: () => {
-          setFindWidgetOpen(true);
-          setOpenMenu(null);
-        },
-      },
-      {
-        label: 'Find in Files (Workspace)',
-        shortcut: 'Ctrl+Shift+F',
-        dividerAfter: true,
-        action: () => {
-          setActivityView('search');
-          setSidebarOpen(true);
-          setOpenMenu(null);
-        },
-      },
-      {
-        label: 'Replace in Files',
-        shortcut: 'Ctrl+Shift+H',
-        dividerAfter: true,
-        action: () => {
-          setActivityView('search');
-          setSearchReplaceExpanded(true);
-          setSidebarOpen(true);
-          setOpenMenu(null);
-        },
-      },
-      {
-        label: 'Copy Developer Email',
-        shortcut: 'Ctrl+C',
-        action: () => {
-          navigator.clipboard?.writeText(DEVELOPER_PROFILE.email);
-          setOpenMenu(null);
-        },
-      },
-    ],
-    Selection: [
-      {
-        label: 'Select All Projects',
-        action: () => handleOpenFile('projects.tsx'),
-      },
-      {
-        label: 'Inspect StreamPulse Case Study',
-        action: () => {
-          setSelectedProject(projects[0]);
-          setOpenMenu(null);
-        },
-      },
-      {
-        label: 'Switch Editor to Raw Code Buffer',
-        action: () => {
-          setEditorMode('code');
           setOpenMenu(null);
         },
       },
@@ -951,26 +858,6 @@ export default function App() {
         },
       },
       {
-        label: 'Source Control',
-        shortcut: 'Ctrl+Shift+G',
-        checked: activityView === 'scm' && sidebarOpen,
-        action: () => {
-          setActivityView('scm');
-          setSidebarOpen(true);
-          setOpenMenu(null);
-        },
-      },
-      {
-        label: 'Run and Debug',
-        shortcut: 'Ctrl+Shift+D',
-        checked: activityView === 'debug' && sidebarOpen,
-        action: () => {
-          setActivityView('debug');
-          setSidebarOpen(true);
-          setOpenMenu(null);
-        },
-      },
-      {
         label: 'Extensions',
         shortcut: 'Ctrl+Shift+X',
         checked: activityView === 'extensions' && sidebarOpen,
@@ -991,7 +878,7 @@ export default function App() {
         },
       },
       {
-        label: 'Appearance: Show Bottom Panel',
+        label: 'Appearance: Show Terminal Panel',
         shortcut: 'Ctrl+`',
         checked: terminalOpen,
         action: () => {
@@ -1072,60 +959,21 @@ export default function App() {
         action: () => openQuickPick(':'),
       },
     ],
-    Run: [
-      {
-        label: isDebugging ? 'Stop Debugging' : 'Start Debugging',
-        shortcut: 'F5',
-        action: () => {
-          setIsDebugging((prev) => !prev);
-          setActivityView('debug');
-          setSidebarOpen(true);
-          setTerminalOpen(true);
-          setActivePanelTab('debug');
-          setOpenMenu(null);
-        },
-      },
-      {
-        label: 'Run Without Debugging',
-        shortcut: 'Ctrl+F5',
-        action: () => {
-          setTerminalOpen(true);
-          setActivePanelTab('terminal');
-          setOpenMenu(null);
-        },
-      },
-    ],
     Terminal: [
       {
-        label: 'New Terminal',
+        label: terminalOpen ? 'Hide Terminal Panel' : 'Open Terminal Panel',
         shortcut: 'Ctrl+`',
         action: () => {
-          setTerminalOpen(true);
+          setTerminalOpen((prev) => !prev);
           setActivePanelTab('terminal');
           setOpenMenu(null);
         },
       },
       {
-        label: 'Show Output Panel',
+        label: terminalExpanded ? 'Restore Terminal Panel Height' : 'Maximize Terminal Panel',
         action: () => {
           setTerminalOpen(true);
-          setActivePanelTab('output');
-          setOpenMenu(null);
-        },
-      },
-      {
-        label: 'Show Problems Panel',
-        action: () => {
-          setTerminalOpen(true);
-          setActivePanelTab('problems');
-          setOpenMenu(null);
-        },
-      },
-      {
-        label: 'Show Forwarded Ports',
-        action: () => {
-          setTerminalOpen(true);
-          setActivePanelTab('ports');
+          setTerminalExpanded((prev) => !prev);
           setOpenMenu(null);
         },
       },
@@ -1160,24 +1008,70 @@ export default function App() {
   };
 
   return (
-    <div className={`h-screen w-screen overflow-hidden flex flex-col select-none ${chromeBg}`}>
-      {/* 1. OFFICIAL VS CODE TITLE BAR & COMMAND CENTER */}
+    <div className={`h-screen-dynamic w-screen overflow-hidden flex flex-col select-none ${chromeBg} safe-top safe-left safe-right relative`}>
+      {/* 1. CROSS-PLATFORM VS CODE TITLE BAR (Supports macOS, Windows 11, Linux, Android, iOS) */}
       <header
-        className={`h-[35px] flex items-center justify-between px-2.5 border-b ${borderCol} ${chromeBg} text-[12px] shrink-0 relative z-40`}
+        className={`h-9 md:h-[35px] flex items-center justify-between px-2 sm:px-2.5 border-b ${borderCol} ${chromeBg} text-[12px] shrink-0 relative z-40`}
       >
-        {/* Left: Official VS Code Ribbon Logo + Menu Bar */}
+        {/* Left: macOS Traffic Lights OR Windows/Linux/Mobile Brand Logo */}
         <div className="flex items-center gap-1.5 min-w-0">
+          {/* macOS Classic Window Traffic Lights */}
+          {activeOS === 'macos' && (
+            <div className="flex items-center gap-2 pr-1.5 group select-none">
+              <button
+                type="button"
+                onClick={() => handleCloseTab(null, activeFile)}
+                title="Close Window / Tab (⌘W)"
+                className="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:opacity-80 flex items-center justify-center cursor-pointer text-[8px] text-black/60 group-hover:text-black"
+              >
+                <span className="opacity-0 group-hover:opacity-100">✕</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTerminalOpen((prev) => !prev)}
+                title="Minimize Panel (⌘M)"
+                className="w-3 h-3 rounded-full bg-[#FFBD2E] border border-[#DEA123] hover:opacity-80 flex items-center justify-center cursor-pointer text-[8px] text-black/60 group-hover:text-black"
+              >
+                <span className="opacity-0 group-hover:opacity-100">−</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditorMode((prev) => (prev === 'split' ? 'hybrid' : 'split'))}
+                title="Zoom / Split Editor (⌘F)"
+                className="w-3 h-3 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:opacity-80 flex items-center justify-center cursor-pointer text-[8px] text-black/60 group-hover:text-black"
+              >
+                <span className="opacity-0 group-hover:opacity-100">+</span>
+              </button>
+            </div>
+          )}
+
+          {/* Android & iOS Mobile Drawer Hamburger Toggle */}
+          {(activeOS === 'android' || activeOS === 'ios') && (
+            <button
+              type="button"
+              onClick={() => {
+                setSidebarOpen((prev) => !prev);
+                setMobileDrawerOpen((prev) => !prev);
+              }}
+              title="Toggle Navigation Menu"
+              className="p-1 rounded hover:bg-[#2A2D2E] text-[#CCCCCC] cursor-pointer md:hidden mr-0.5"
+            >
+              <Codicon name="menu" className="!text-[16px]" />
+            </button>
+          )}
+
+          {/* Official VS Code Ribbon Logo */}
           <div className="px-1 flex items-center shrink-0">
             <OfficialVSCodeLogo className="w-4 h-4" />
           </div>
 
-          {/* Official Menu Bar with Working Dropdowns & Checkmarks */}
+          {/* Official Menu Bar with Working Dropdowns & Checkmarks (Hidden on narrow mobile screens) */}
           <nav
             aria-label="VS Code Menu Bar"
             className="hidden md:flex items-center gap-0.5 relative"
           >
             {(
-              ['File', 'Edit', 'Selection', 'View', 'Go', 'Run', 'Terminal', 'Help'] as Array<
+              ['File', 'View', 'Go', 'Terminal', 'Help'] as Array<
                 Exclude<MenuId, null>
               >
             ).map((menuName) => {
@@ -1223,7 +1117,7 @@ export default function App() {
                               </span>
                               {item.shortcut && (
                                 <span className="font-mono text-[10px] text-[#858585]">
-                                  {item.shortcut}
+                                  {formatShortcut(item.shortcut, activeOS)}
                                 </span>
                               )}
                             </button>
@@ -1241,14 +1135,14 @@ export default function App() {
           </nav>
         </div>
 
-        {/* Center: Official Navigation Arrows + Command Center Search Bar */}
+        {/* Center: Navigation History Arrows + Command Center Quick Open Search Bar */}
         <div className="flex items-center gap-1.5">
           <div className="hidden sm:flex items-center gap-0.5">
             <button
               type="button"
               onClick={handleNavBack}
               disabled={navHistoryIdx <= 0}
-              title="Go Back (Alt+Left)"
+              title={`Go Back (${formatShortcut('Alt+Left', activeOS)})`}
               className="p-1 rounded hover:bg-[#2A2D2E] disabled:opacity-35 text-[#CCCCCC] flex items-center justify-center cursor-pointer"
             >
               <Codicon name="arrow-left" className="!text-[14px]" />
@@ -1257,7 +1151,7 @@ export default function App() {
               type="button"
               onClick={handleNavForward}
               disabled={navHistoryIdx >= navHistory.length - 1}
-              title="Go Forward (Alt+Right)"
+              title={`Go Forward (${formatShortcut('Alt+Right', activeOS)})`}
               className="p-1 rounded hover:bg-[#2A2D2E] disabled:opacity-35 text-[#CCCCCC] flex items-center justify-center cursor-pointer"
             >
               <Codicon name="arrow-right" className="!text-[14px]" />
@@ -1267,8 +1161,8 @@ export default function App() {
           <button
             type="button"
             onClick={() => openQuickPick('')}
-            title="Search files by name (Ctrl+P) or run commands (Ctrl+Shift+P)"
-            className={`flex items-center justify-center gap-1.5 sm:gap-2 w-36 sm:w-64 md:w-80 lg:w-96 h-[22px] px-2 sm:px-3 rounded-[5px] border ${
+            title={`Search files by name (${formatShortcut('Ctrl+P', activeOS)}) or run commands (${formatShortcut('Ctrl+Shift+P', activeOS)})`}
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 w-32 xs:w-44 sm:w-64 md:w-80 lg:w-96 h-[22px] px-2 sm:px-3 rounded-[5px] border ${
               isDark
                 ? 'bg-[#252526] hover:bg-[#2A2D2E] border-[#3C3C3C] text-[#CCCCCC]'
                 : 'bg-[#ECECEC] hover:bg-[#E0E0E0] border-[#D0D0D0] text-[#3B3B3B]'
@@ -1279,12 +1173,46 @@ export default function App() {
           </button>
         </div>
 
-        {/* Right: Official VS Code Layout Controls & Window Chrome Buttons */}
-        <div className="flex items-center gap-0.5 shrink-0">
+        {/* Right: OS Switcher, PWA Install, Resume PDF, and Window Controls */}
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          {/* Interactive OS Switcher Pill */}
+          <button
+            type="button"
+            onClick={() => setOSModalOpen(true)}
+            title={`Active OS: ${OS_META[activeOS].name} (${isAutoOS ? 'Auto-Detected' : 'Manual'}). Click to switch layout!`}
+            className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-[4px] border border-[#3C3C3C] hover:bg-[#2A2D2E] text-[11px] font-mono text-[#CCCCCC] transition-colors cursor-pointer shrink-0"
+          >
+            <span className="text-xs">
+              {activeOS === 'macos' && '🍎'}
+              {activeOS === 'windows' && '🪟'}
+              {activeOS === 'linux' && '🐧'}
+              {activeOS === 'android' && '🤖'}
+              {activeOS === 'ios' && '📱'}
+            </span>
+            <span className="hidden sm:inline font-medium">{OS_META[activeOS].name}</span>
+            <Codicon name="chevron-down" className="!text-[10px] text-[#858585]" />
+          </button>
+
+          {/* In-App PWA Install Action */}
+          <PWAInstallButton />
+
+          {/* Resume PDF Action Button */}
+          <a
+            href={DEVELOPER_PROFILE.resumeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Download / View MD Mustafa Hossain's Resume (PDF)"
+            className="hidden sm:inline-flex items-center gap-1.5 h-[22px] px-2.5 rounded-[4px] bg-[#0078D4] hover:bg-[#1084DF] text-white text-[11px] font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <Codicon name="file-pdf" className="!text-[12px]" />
+            <span>Resume</span>
+          </a>
+
+          {/* Sidebar Toggle Action */}
           <button
             type="button"
             onClick={() => setSidebarOpen((prev) => !prev)}
-            title="Toggle Primary Side Bar (Ctrl+B)"
+            title={`Toggle Primary Side Bar (${formatShortcut('Ctrl+B', activeOS)})`}
             className="p-1 rounded hover:bg-[#2A2D2E] text-[#CCCCCC] flex items-center justify-center cursor-pointer"
           >
             <Codicon
@@ -1293,10 +1221,11 @@ export default function App() {
             />
           </button>
 
+          {/* Terminal Toggle Action */}
           <button
             type="button"
             onClick={() => setTerminalOpen((prev) => !prev)}
-            title="Toggle Panel (Ctrl+`)"
+            title={`Toggle Terminal Panel (${formatShortcut('Ctrl+`', activeOS)})`}
             className="p-1 rounded hover:bg-[#2A2D2E] text-[#CCCCCC] flex items-center justify-center cursor-pointer"
           >
             <Codicon
@@ -1305,109 +1234,152 @@ export default function App() {
             />
           </button>
 
-          <button
-            type="button"
-            onClick={() =>
-              handleUpdateSettings({ minimapEnabled: !settings.minimapEnabled })
-            }
-            title="Toggle Code Minimap (Alt+M)"
-            className="p-1 rounded hover:bg-[#2A2D2E] text-[#CCCCCC] flex items-center justify-center cursor-pointer"
-          >
-            <Codicon
-              name={minimapVisible ? 'layout-sidebar-right' : 'layout-sidebar-right-off'}
-              className="!text-[15px]"
-            />
-          </button>
+          {/* Windows 11 Fluent Window Controls */}
+          {activeOS === 'windows' && (
+            <div className="hidden sm:flex items-center ml-1 border-l border-[#3C3C3C] pl-1">
+              <button
+                type="button"
+                onClick={() => setTerminalOpen((prev) => !prev)}
+                title="Minimize Terminal"
+                className="w-7 h-[22px] flex items-center justify-center hover:bg-[#2A2D2E] text-[#CCCCCC] cursor-pointer text-xs"
+              >
+                <span>−</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditorMode((prev) => (prev === 'split' ? 'hybrid' : 'split'))}
+                title="Maximize / Restore Split Editor"
+                className="w-7 h-[22px] flex items-center justify-center hover:bg-[#2A2D2E] text-[#CCCCCC] cursor-pointer text-xs"
+              >
+                <span>□</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCloseTab(null, activeFile)}
+                title="Close Tab"
+                className="w-7 h-[22px] flex items-center justify-center hover:bg-[#E81123] hover:text-white text-[#CCCCCC] cursor-pointer text-xs"
+              >
+                <span>✕</span>
+              </button>
+            </div>
+          )}
 
-          {/* Window Minimize / Restore / Close Glyphs */}
-          <div className="hidden xl:flex items-center ml-2 border-l border-[#2B2B2B] pl-1 text-[#868686]">
-            <button
-              type="button"
-              onClick={() => setTerminalExpanded(false)}
-              title="Minimize Panel"
-              className="px-2 py-1 hover:bg-[#2A2D2E] hover:text-white flex items-center justify-center cursor-pointer"
-            >
-              <Codicon name="chrome-minimize" className="!text-[13px]" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setSidebarOpen((prev) => !prev)}
-              title="Restore Layout"
-              className="px-2 py-1 hover:bg-[#2A2D2E] hover:text-white flex items-center justify-center cursor-pointer"
-            >
-              <Codicon name="chrome-restore" className="!text-[13px]" />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleOpenFile('overview.tsx')}
-              title="Reset to Overview"
-              className="px-2 py-1 hover:bg-[#E81123] hover:text-white flex items-center justify-center cursor-pointer"
-            >
-              <Codicon name="chrome-close" className="!text-[13px]" />
-            </button>
-          </div>
+          {/* Linux GNOME Rounded Controls */}
+          {activeOS === 'linux' && (
+            <div className="hidden sm:flex items-center gap-1 ml-1 border-l border-[#3C3C3C] pl-1.5 select-none">
+              <button
+                type="button"
+                onClick={() => setTerminalOpen((prev) => !prev)}
+                title="Minimize"
+                className="w-4 h-4 rounded-full bg-[#3C3C3C] hover:bg-[#4C4C4C] text-white flex items-center justify-center text-[10px] cursor-pointer font-bold"
+              >
+                −
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditorMode((prev) => (prev === 'split' ? 'hybrid' : 'split'))}
+                title="Maximize / Restore"
+                className="w-4 h-4 rounded-full bg-[#3C3C3C] hover:bg-[#4C4C4C] text-white flex items-center justify-center text-[10px] cursor-pointer font-bold"
+              >
+                +
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCloseTab(null, activeFile)}
+                title="Close"
+                className="w-4 h-4 rounded-full bg-[#E95420] hover:bg-[#D84918] text-white flex items-center justify-center text-[10px] cursor-pointer font-bold"
+              >
+                ×
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
-      {/* OFFICIAL FLOATING VS CODE DEBUG TOOLBAR (VISIBLE WHEN DEBUGGING F5 IS ACTIVE) */}
-      {isDebugging && (
-        <div className="fixed top-[38px] left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 px-2.5 py-1 rounded-xs bg-[#252526] border border-[#454545] shadow-xl">
-          <Codicon name="gripper" className="!text-[14px] text-[#858585] mr-1 cursor-move" />
+      {/* RECRUITER & HR QUICK TOUR STRIP (Non-intrusive 1-click evaluation shortcuts) */}
+      {!recruiterTourDismissed && (
+        <div
+          className={`h-9 px-2 sm:px-4 border-b ${borderCol} ${
+            isDark ? 'bg-[#181818]' : 'bg-[#F0F0F0]'
+          } flex items-center justify-between gap-2 sm:gap-3 text-xs shrink-0 z-20`}
+        >
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar min-w-0">
+            <span className="text-[11px] font-mono text-[#4EC9B0] shrink-0 font-medium hidden xs:inline">
+              Recruiter Quick Tour:
+            </span>
+
+            <a
+              href={DEVELOPER_PROFILE.resumeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-[#0078D4] hover:bg-[#1084DF] text-white text-[11px] font-medium whitespace-nowrap shrink-0 transition-colors"
+            >
+              <Codicon name="file-pdf" className="!text-[12px]" />
+              <span>View Resume (PDF)</span>
+            </a>
+
+            <PWAInstallButton variant="pill" />
+
+            <button
+              type="button"
+              onClick={() => handleOpenFile('projects.tsx')}
+              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded border ${
+                isDark ? 'border-[#3C3C3C] hover:bg-[#2A2D2E] text-[#CCCCCC]' : 'border-slate-300 hover:bg-white text-slate-800'
+              } text-[11px] font-mono whitespace-nowrap shrink-0 transition-colors cursor-pointer`}
+            >
+              <Codicon name="repo" className="!text-[12px] text-[#4FC1FF]" />
+              <span>Projects (3)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleOpenFile('education.md')}
+              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded border ${
+                isDark ? 'border-[#3C3C3C] hover:bg-[#2A2D2E] text-[#CCCCCC]' : 'border-slate-300 hover:bg-white text-slate-800'
+              } text-[11px] font-mono whitespace-nowrap shrink-0 transition-colors cursor-pointer`}
+            >
+              <Codicon name="mortar-board" className="!text-[12px] text-[#4EC9B0]" />
+              <span>Academics</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleOpenFile('contact.tsx')}
+              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded border ${
+                isDark ? 'border-[#3C3C3C] hover:bg-[#2A2D2E] text-[#CCCCCC]' : 'border-slate-300 hover:bg-white text-slate-800'
+              } text-[11px] font-mono whitespace-nowrap shrink-0 transition-colors cursor-pointer`}
+            >
+              <Codicon name="mail" className="!text-[12px] text-[#CE9178]" />
+              <span>Get in Touch</span>
+            </button>
+          </div>
+
           <button
             type="button"
-            onClick={() => appendSyncLog('[Debugger] Continued execution')}
-            title="Continue (F5)"
-            className="p-1 rounded hover:bg-[#2A2D2E] text-[#75BEFF] flex items-center cursor-pointer"
+            onClick={() => {
+              setRecruiterTourDismissed(true);
+              try {
+                localStorage.setItem('mustafa_recruiter_tour_dismissed', 'true');
+              } catch {
+                // ignore storage error
+              }
+            }}
+            title="Dismiss Quick Tour"
+            className="p-1 rounded hover:bg-[#2A2D2E] text-[#858585] hover:text-white cursor-pointer shrink-0"
           >
-            <Codicon name="debug-continue" className="!text-[15px]" />
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              setCursorPos((prev) => ({ line: Math.min(42, prev.line + 1), col: 1 }))
-            }
-            title="Step Over (F10)"
-            className="p-1 rounded hover:bg-[#2A2D2E] text-[#75BEFF] flex items-center cursor-pointer"
-          >
-            <Codicon name="debug-step-over" className="!text-[15px]" />
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              setCursorPos((prev) => ({ line: Math.min(42, prev.line + 1), col: 4 }))
-            }
-            title="Step Into (F11)"
-            className="p-1 rounded hover:bg-[#2A2D2E] text-[#75BEFF] flex items-center cursor-pointer"
-          >
-            <Codicon name="debug-step-into" className="!text-[15px]" />
-          </button>
-          <button
-            type="button"
-            onClick={() => handleTriggerSync(false)}
-            title="Restart (Ctrl+Shift+F5)"
-            className="p-1 rounded hover:bg-[#2A2D2E] text-[#89D185] flex items-center cursor-pointer"
-          >
-            <Codicon name="debug-restart" className="!text-[15px]" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsDebugging(false)}
-            title="Stop (Shift+F5)"
-            className="p-1 rounded hover:bg-[#2A2D2E] text-[#F48771] flex items-center cursor-pointer"
-          >
-            <Codicon name="debug-stop" className="!text-[15px]" />
+            <Codicon name="close" className="!text-[13px]" />
           </button>
         </div>
       )}
 
       {/* 2. MAIN WORKBENCH BODY (Activity Bar + Primary Side Bar + Editor Group & Panel) */}
       <div className="flex-1 flex min-h-0 relative">
-        {/* Far-Left Activity Bar using Official @vscode/codicons */}
+        {/* Far-Left Activity Bar using Official @vscode/codicons (44px min width on mobile, 48px on sm+) */}
         <aside
           aria-label="VS Code Activity Bar"
-          className={`w-10 sm:w-12 flex flex-col items-center justify-between py-0.5 border-r ${borderCol} ${chromeBg} shrink-0 z-30`}
+          className={`w-11 sm:w-12 flex flex-col items-center justify-between py-0.5 border-r ${borderCol} ${chromeBg} shrink-0 z-30`}
         >
-          {/* Top 5 Official Activity Icons */}
+          {/* Top 3 Core Official Activity Icons */}
           <div className="flex flex-col items-center w-full">
             {(
               [
@@ -1420,18 +1392,11 @@ export default function App() {
                       ? String(messages.filter((m) => !m.read).length)
                       : undefined,
                 },
-                { id: 'search', icon: 'search', title: 'Search (Ctrl+Shift+F)' },
-                {
-                  id: 'scm',
-                  icon: 'source-control',
-                  title: 'Source Control (Ctrl+Shift+G)',
-                  badge: String(projects.length),
-                },
-                { id: 'debug', icon: 'debug-alt', title: 'Run and Debug (Ctrl+Shift+D)' },
+                { id: 'search', icon: 'search', title: 'Search Portfolio (Ctrl+Shift+F)' },
                 {
                   id: 'extensions',
                   icon: 'extensions',
-                  title: 'Extensions (Ctrl+Shift+X)',
+                  title: 'Tech Stack & Extensions (Ctrl+Shift+X)',
                   badge: String(PORTFOLIO_SKILLS.length),
                 },
               ] as Array<{
@@ -1448,7 +1413,7 @@ export default function App() {
                   type="button"
                   onClick={() => handleActivityClick(item.id)}
                   title={item.title}
-                  className={`relative w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center transition-colors cursor-pointer ${
+                  className={`relative w-11 h-11 sm:w-12 sm:h-12 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors cursor-pointer ${
                     active
                       ? isDark
                         ? 'text-white'
@@ -1459,79 +1424,53 @@ export default function App() {
                   {active && (
                     <span className="absolute left-0 top-0 bottom-0 w-[2px] bg-[#0078D4]" />
                   )}
-                  <Codicon name={item.icon} className="!text-[20px] sm:!text-[24px]" />
+                  <Codicon name={item.icon} className="!text-[22px] sm:!text-[24px]" />
                   {item.badge && (
-                    <span className="absolute bottom-1 right-1 sm:bottom-1.5 sm:right-1.5 px-1 min-w-[15px] h-3.5 sm:min-w-[16px] sm:h-4 rounded-full bg-[#0078D4] text-white text-[9px] font-sans font-semibold flex items-center justify-center tabular-nums">
+                    <span className="absolute bottom-1 right-1 sm:bottom-1.5 sm:right-1.5 px-1 min-w-[16px] h-4 rounded-full bg-[#0078D4] text-white text-[9px] font-sans font-semibold flex items-center justify-center tabular-nums">
                       {item.badge}
                     </span>
                   )}
                 </button>
               );
             })}
+
+            {/* Official Google Gemini AI Assistant Icon directly under Extensions */}
+            <button
+              type="button"
+              onClick={() => handleActivityClick('gemini')}
+              title="Gemini AI Assistant"
+              className={`relative w-11 h-11 sm:w-12 sm:h-12 min-w-[44px] min-h-[44px] flex items-center justify-center transition-opacity cursor-pointer ${
+                activityView === 'gemini' && sidebarOpen
+                  ? 'opacity-100'
+                  : 'opacity-85 hover:opacity-100'
+              }`}
+            >
+              {activityView === 'gemini' && sidebarOpen && (
+                <span className="absolute left-0 top-0 bottom-0 w-[2px] bg-[#0078D4]" />
+              )}
+              <OfficialGeminiLogo className="w-[22px] h-[22px] sm:w-6 sm:h-6" />
+            </button>
           </div>
 
-          {/* Bottom Official Account & Manage Gear Icons */}
+          {/* Bottom Official Theme & Settings Icons */}
           <div className="flex flex-col items-center w-full relative">
             <button
               type="button"
-              onClick={() => {
-                setAccountMenuOpen((prev) => !prev);
-                setSettingsMenuOpen(false);
-              }}
-              title={`Accounts — ${DEVELOPER_PROFILE.name}`}
-              className="relative w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center text-[#868686] hover:text-[#D7D7D7] transition-colors cursor-pointer"
+              onClick={() => handleToggleTheme()}
+              title={`Switch to ${isDark ? 'Light Modern' : 'Dark Modern'} Theme (Alt+T)`}
+              className="relative w-11 h-11 sm:w-12 sm:h-12 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#868686] hover:text-[#D7D7D7] transition-colors cursor-pointer"
             >
-              <Codicon name="account" className="!text-[20px] sm:!text-[24px]" />
+              <Codicon name={isDark ? 'color-mode' : 'lightbulb'} className="!text-[20px] sm:!text-[22px]" />
             </button>
 
             <button
               type="button"
-              onClick={() => {
-                setSettingsMenuOpen((prev) => !prev);
-                setAccountMenuOpen(false);
-              }}
+              onClick={() => setSettingsMenuOpen((prev) => !prev)}
               title="Manage / Settings (Ctrl+,)"
-              className="relative w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center text-[#868686] hover:text-[#D7D7D7] transition-colors cursor-pointer"
+              className="relative w-11 h-11 sm:w-12 sm:h-12 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#868686] hover:text-[#D7D7D7] transition-colors cursor-pointer"
             >
-              <Codicon name="settings-gear" className="!text-[20px] sm:!text-[24px]" />
+              <Codicon name="settings-gear" className="!text-[22px] sm:!text-[24px]" />
             </button>
-
-            {/* Account Context Menu */}
-            {accountMenuOpen && (
-              <div onClick={() => setAccountMenuOpen(false)} className="fixed inset-0 z-40">
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  className="absolute left-12 bottom-12 w-64 rounded-md border border-[#454545] bg-[#252526] text-[#CCCCCC] shadow-xl py-1 text-xs z-50"
-                >
-                  <div className="px-3 py-1.5 border-b border-[#3C3C3C]">
-                    <div className="font-semibold text-white">
-                      {DEVELOPER_PROFILE.name} (GitHub)
-                    </div>
-                    <div className="text-[11px] text-[#858585]">{DEVELOPER_PROFILE.email}</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleOpenFile('overview.tsx');
-                      setAccountMenuOpen(false);
-                    }}
-                    className="w-full px-3 py-1.5 hover:bg-[#04395E] hover:text-white text-left cursor-pointer"
-                  >
-                    Open Developer Profile
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      handleTriggerSync(false);
-                      setAccountMenuOpen(false);
-                    }}
-                    className="w-full px-3 py-1.5 hover:bg-[#04395E] hover:text-white text-left cursor-pointer"
-                  >
-                    Settings Sync is On (Rev #{syncStats.syncCount})
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* Settings Gear Context Menu */}
             {settingsMenuOpen && (
@@ -1609,18 +1548,19 @@ export default function App() {
           aria-label="VS Code Primary Side Bar"
           className={`${
             sidebarOpen || mobileDrawerOpen
-              ? 'fixed top-[35px] bottom-[22px] left-10 sm:left-12 z-40 w-64 shadow-2xl flex md:static md:shadow-none md:w-56 lg:w-64'
+              ? `fixed top-[35px] bottom-[22px] left-11 sm:left-12 z-40 w-[min(20rem,calc(100vw-2.75rem))] sm:w-72 shadow-2xl flex md:static md:shadow-none ${
+                  activityView === 'gemini' ? 'md:w-72 lg:w-80' : 'md:w-56 lg:w-64'
+                }`
               : 'hidden'
           } flex-col border-r ${borderCol} ${chromeBg} shrink-0`}
         >
-          {/* Side Bar View Title Header with Official Action Icons */}
-          <div className="h-[35px] px-4 flex items-center justify-between text-[11px] font-sans tracking-wide uppercase text-[#BBBBBB] shrink-0 relative">
+          {/* Side Bar View Title Header with Official Action Icons (44px min height on mobile, 35px on md+) */}
+          <div className="h-11 md:h-[35px] pl-4 pr-1 md:px-4 flex items-center justify-between text-[11px] font-sans tracking-wide uppercase text-[#BBBBBB] shrink-0 relative">
             <span className="truncate font-semibold">
               {activityView === 'explorer' && 'EXPLORER'}
               {activityView === 'search' && 'SEARCH'}
-              {activityView === 'scm' && 'SOURCE CONTROL'}
-              {activityView === 'debug' && 'RUN AND DEBUG'}
               {activityView === 'extensions' && 'EXTENSIONS'}
+              {activityView === 'gemini' && 'GEMINI AI ASSISTANT'}
             </span>
             <div className="flex items-center gap-0.5 relative">
               {activityView === 'explorer' && (
@@ -1632,93 +1572,13 @@ export default function App() {
                       return !prev;
                     });
                   }}
-                  title="Filter on Type in Explorer"
-                  className={`p-1 rounded hover:bg-[#2A2D2E] cursor-pointer flex items-center ${
+                  title="Filter Files by Name"
+                  className={`min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 p-2.5 md:p-1 rounded hover:bg-[#2A2D2E] cursor-pointer flex items-center justify-center ${
                     explorerFilterOpen ? 'bg-[#04395E] text-white' : 'text-[#CCCCCC]'
                   }`}
                 >
                   <Codicon name="filter" className="!text-[14px]" />
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  if (activityView === 'explorer') {
-                    setExplorerViewsMenuOpen((prev) => !prev);
-                  } else {
-                    openQuickPick('> ');
-                  }
-                }}
-                title="Views and More Actions..."
-                className="p-1 rounded hover:bg-[#2A2D2E] text-[#CCCCCC] flex items-center cursor-pointer"
-              >
-                <Codicon name="ellipsis" className="!text-[14px]" />
-              </button>
-
-              {/* Official VS Code Explorer Views Visibility Menu (...) */}
-              {activityView === 'explorer' && explorerViewsMenuOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setExplorerViewsMenuOpen(false)}
-                  />
-                  <div className="absolute right-0 top-7 w-52 rounded-md border border-[#454545] bg-[#252526] text-[#CCCCCC] shadow-xl py-1 z-50 text-xs normal-case tracking-normal font-normal">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowOpenEditors((prev) => !prev);
-                        setExplorerViewsMenuOpen(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#04395E] hover:text-white text-left cursor-pointer"
-                    >
-                      <span className="w-3.5 flex items-center justify-center">
-                        {showOpenEditors && <Codicon name="check" className="!text-[12px]" />}
-                      </span>
-                      <span>Open Editors</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setWorkspaceTreeExpanded((prev) => !prev);
-                        setExplorerViewsMenuOpen(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#04395E] hover:text-white text-left cursor-pointer"
-                    >
-                      <span className="w-3.5 flex items-center justify-center">
-                        {workspaceTreeExpanded && (
-                          <Codicon name="check" className="!text-[12px]" />
-                        )}
-                      </span>
-                      <span>Folders (mustafa-dev-portfolio)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowOutline((prev) => !prev);
-                        setExplorerViewsMenuOpen(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#04395E] hover:text-white text-left cursor-pointer"
-                    >
-                      <span className="w-3.5 flex items-center justify-center">
-                        {showOutline && <Codicon name="check" className="!text-[12px]" />}
-                      </span>
-                      <span>Outline</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowTimeline((prev) => !prev);
-                        setExplorerViewsMenuOpen(false);
-                      }}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#04395E] hover:text-white text-left cursor-pointer"
-                    >
-                      <span className="w-3.5 flex items-center justify-center">
-                        {showTimeline && <Codicon name="check" className="!text-[12px]" />}
-                      </span>
-                      <span>Timeline</span>
-                    </button>
-                  </div>
-                </>
               )}
             </div>
           </div>
@@ -1728,7 +1588,7 @@ export default function App() {
             <div className="flex-1 overflow-y-auto text-[13px] select-none relative">
               {/* Optional Filter on Type Input Box inside Explorer */}
               {explorerFilterOpen && (
-                <div className="px-2.5 py-1.5 border-b border-[#2B2B2B] bg-[#181818] flex items-center gap-1.5">
+                <div className="px-2.5 py-1.5 border-b border-[#2B2B2B] bg-[#181818] flex items-center gap-1.5 min-h-[44px] md:min-h-0">
                   <Codicon name="filter" className="!text-[12px] text-[#0078D4] shrink-0" />
                   <input
                     type="text"
@@ -1736,14 +1596,14 @@ export default function App() {
                     value={explorerFilterQuery}
                     onChange={(e) => setExplorerFilterQuery(e.target.value)}
                     placeholder="Filter files & pages by name..."
-                    className="w-full bg-[#252526] border border-[#0078D4] rounded-xs px-2 py-0.5 text-[11px] text-white focus:outline-none"
+                    className="w-full bg-[#252526] border border-[#0078D4] rounded-xs px-2 py-1 md:py-0.5 text-[12px] md:text-[11px] text-white focus:outline-none"
                   />
                   {explorerFilterQuery && (
                     <button
                       type="button"
                       onClick={() => setExplorerFilterQuery('')}
                       title="Clear Filter"
-                      className="text-[#858585] hover:text-white cursor-pointer flex items-center"
+                      className="min-w-[36px] min-h-[36px] md:min-w-0 md:min-h-0 text-[#858585] hover:text-white cursor-pointer flex items-center justify-center"
                     >
                       <Codicon name="close" className="!text-[12px]" />
                     </button>
@@ -1751,124 +1611,13 @@ export default function App() {
                 </div>
               )}
 
-              {/* Section 1: OPEN EDITORS */}
-              {showOpenEditors && (
-                <div>
-                  <div className="group flex items-center justify-between pr-2 hover:bg-[#2A2D2E]">
-                    <button
-                      type="button"
-                      onClick={() => setOpenEditorsExpanded((prev) => !prev)}
-                      className="flex-1 flex items-center gap-1 px-1.5 py-1 font-bold text-[11px] uppercase tracking-wide cursor-pointer text-left"
-                    >
-                      <Codicon
-                        name={openEditorsExpanded ? 'chevron-down' : 'chevron-right'}
-                        className="!text-[14px]"
-                      />
-                      <span>OPEN EDITORS</span>
-                    </button>
-                    <div className="flex items-center gap-0.5">
-                      <button
-                        type="button"
-                        onClick={() => handleCreateUntitledFile()}
-                        title="New Untitled Text File (Ctrl+N)"
-                        className="p-0.5 rounded hover:bg-[#3C3C3C] text-[#858585] hover:text-white cursor-pointer flex items-center"
-                      >
-                        <Codicon name="new-file" className="!text-[13px]" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleTriggerSync(false)}
-                        title="Save All (Ctrl+K S)"
-                        className="p-0.5 rounded hover:bg-[#3C3C3C] text-[#858585] hover:text-white cursor-pointer flex items-center"
-                      >
-                        <Codicon name="save-all" className="!text-[13px]" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setOpenTabs([activeFile])}
-                        title="Close Other Editors"
-                        className="p-0.5 rounded hover:bg-[#3C3C3C] text-[#858585] hover:text-white cursor-pointer flex items-center"
-                      >
-                        <Codicon name="close-all" className="!text-[13px]" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {openEditorsExpanded && (
-                    <div className="py-0.5">
-                      {openTabs.map((tabId) => {
-                        const file = getTabMeta(tabId);
-                        const active = activeFile === tabId;
-                        return (
-                          <div
-                            key={tabId}
-                            onClick={() => handleOpenFile(tabId)}
-                            onContextMenu={(e) => {
-                              e.preventDefault();
-                              setExplorerContextMenu({
-                                x: e.clientX,
-                                y: e.clientY,
-                                fileId: tabId,
-                                filePath: file.path,
-                                isCustom: Boolean(customFiles[tabId]),
-                              });
-                            }}
-                            className={`group flex items-center justify-between pl-2 pr-2 py-0.5 cursor-pointer text-[13px] ${
-                              active
-                                ? 'bg-[#04395E] text-white outline-1 -outline-offset-1 outline-[#0078D4]'
-                                : 'hover:bg-[#2A2D2E] text-[#CCCCCC]'
-                            }`}
-                          >
-                            <span className="flex items-center gap-1.5 truncate min-w-0">
-                              <button
-                                type="button"
-                                onClick={(e) => handleCloseTab(e, tabId)}
-                                title="Close (Ctrl+W)"
-                                className={`w-4 h-4 flex items-center justify-center rounded hover:bg-[#3C3C3C] shrink-0 ${
-                                  openTabs.length > 1
-                                    ? 'opacity-0 group-hover:opacity-100'
-                                    : 'opacity-0 pointer-events-none'
-                                } ${active ? 'opacity-100 text-white' : 'text-[#CCCCCC]'}`}
-                              >
-                                <Codicon name="close" className="!text-[12px]" />
-                              </button>
-                              <SetiFileIcon
-                                fileId={file.id}
-                                extension={file.extension}
-                                className="w-4 h-4 shrink-0"
-                              />
-                              <span className="truncate">{file.name}</span>
-                              <span className="text-[11px] text-[#858585] truncate ml-1">
-                                {file.folder}
-                              </span>
-                            </span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenFile(tabId);
-                                setEditorMode('split');
-                              }}
-                              title="Split Editor Right"
-                              className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-[#3C3C3C] text-[#CCCCCC] hover:text-white flex items-center shrink-0"
-                            >
-                              <Codicon name="split-horizontal" className="!text-[12px]" />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Section 2: WORKSPACE ROOT FOLDER (MUSTAFA-DEV-PORTFOLIO) */}
+              {/* WORKSPACE ROOT FOLDER (MUSTAFA-DEV-PORTFOLIO) */}
               <div>
-                <div className="group flex items-center justify-between pr-1.5 border-t border-[#2B2B2B] hover:bg-[#2A2D2E]">
+                <div className="group flex items-center justify-between pr-1 md:pr-1.5 border-t border-[#2B2B2B] hover:bg-[#2A2D2E] min-h-[44px] md:min-h-0">
                   <button
                     type="button"
                     onClick={() => setWorkspaceTreeExpanded((prev) => !prev)}
-                    className="flex-1 flex items-center gap-1 px-1.5 py-1 font-bold text-[11px] uppercase tracking-wide cursor-pointer text-left min-w-0"
+                    className="flex-1 min-h-[44px] md:min-h-0 flex items-center gap-1 px-1.5 py-2 md:py-1 font-bold text-[11px] uppercase tracking-wide cursor-pointer text-left min-w-0"
                   >
                     <Codicon
                       name={workspaceTreeExpanded ? 'chevron-down' : 'chevron-right'}
@@ -1877,48 +1626,8 @@ export default function App() {
                     <span className="truncate">MUSTAFA-DEV-PORTFOLIO</span>
                   </button>
 
-                  {/* Official 4 VS Code Explorer Header Action Icons */}
+                  {/* Clean Explorer Collapse Action Icon */}
                   <div className="flex items-center gap-0.5 shrink-0">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setWorkspaceTreeExpanded(true);
-                        setSrcRootExpanded(true);
-                        setSrcFolderExpanded(true);
-                        setCreatingNewFile(true);
-                        setCreatingNewFolder(false);
-                      }}
-                      title="New File..."
-                      className="p-1 rounded hover:bg-[#3C3C3C] text-[#CCCCCC] hover:text-white cursor-pointer flex items-center"
-                    >
-                      <Codicon name="new-file" className="!text-[14px]" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setWorkspaceTreeExpanded(true);
-                        setSrcRootExpanded(true);
-                        setCreatingNewFolder(true);
-                        setCreatingNewFile(false);
-                      }}
-                      title="New Folder..."
-                      className="p-1 rounded hover:bg-[#3C3C3C] text-[#CCCCCC] hover:text-white cursor-pointer flex items-center"
-                    >
-                      <Codicon name="new-folder" className="!text-[14px]" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleTriggerSync(false);
-                      }}
-                      title="Refresh Explorer"
-                      className="p-1 rounded hover:bg-[#3C3C3C] text-[#CCCCCC] hover:text-white cursor-pointer flex items-center"
-                    >
-                      <Codicon name="refresh" className="!text-[14px]" />
-                    </button>
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1926,7 +1635,7 @@ export default function App() {
                         handleCollapseAllExplorer();
                       }}
                       title="Collapse Folders in Explorer"
-                      className="p-1 rounded hover:bg-[#3C3C3C] text-[#CCCCCC] hover:text-white cursor-pointer flex items-center"
+                      className="min-w-[38px] min-h-[44px] md:min-w-0 md:min-h-0 p-2 md:p-1 rounded hover:bg-[#3C3C3C] text-[#CCCCCC] hover:text-white cursor-pointer flex items-center justify-center"
                     >
                       <Codicon name="collapse-all" className="!text-[14px]" />
                     </button>
@@ -1939,7 +1648,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => setSrcRootExpanded((prev) => !prev)}
-                      className="w-full flex items-center gap-1.5 pl-3 pr-2 py-0.5 hover:bg-[#2A2D2E] text-left cursor-pointer text-[13px] text-[#CCCCCC]"
+                      className="w-full min-h-[44px] md:min-h-0 flex items-center gap-1.5 pl-3 pr-2 py-2 md:py-0.5 hover:bg-[#2A2D2E] text-left cursor-pointer text-[13px] text-[#CCCCCC]"
                     >
                       <Codicon
                         name={srcRootExpanded ? 'chevron-down' : 'chevron-right'}
@@ -1965,7 +1674,7 @@ export default function App() {
                               setNewFolderNameInput('');
                               setCreatingNewFolder(false);
                             }}
-                            className="flex items-center gap-1.5 pl-3 pr-2 py-0.5"
+                            className="flex items-center gap-1.5 pl-3 pr-2 py-1.5 md:py-0.5 min-h-[44px] md:min-h-0"
                           >
                             <Codicon
                               name="folder"
@@ -1978,7 +1687,7 @@ export default function App() {
                               onChange={(e) => setNewFolderNameInput(e.target.value)}
                               onBlur={() => setCreatingNewFolder(false)}
                               placeholder="folder-name"
-                              className="w-full px-1.5 py-0.5 bg-[#3C3C3C] border border-[#0078D4] text-xs text-white focus:outline-none"
+                              className="w-full px-1.5 py-1 md:py-0.5 bg-[#3C3C3C] border border-[#0078D4] text-xs text-white focus:outline-none"
                             />
                           </form>
                         )}
@@ -1987,7 +1696,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => setSrcFolderExpanded((prev) => !prev)}
-                          className="w-full flex items-center justify-between pl-2.5 pr-2 py-0.5 hover:bg-[#2A2D2E] text-left cursor-pointer text-[13px] text-[#CCCCCC]"
+                          className="w-full min-h-[44px] md:min-h-0 flex items-center justify-between pl-2.5 pr-2 py-2 md:py-0.5 hover:bg-[#2A2D2E] text-left cursor-pointer text-[13px] text-[#CCCCCC]"
                         >
                           <span className="flex items-center gap-1.5 truncate">
                             <Codicon
@@ -2019,7 +1728,7 @@ export default function App() {
                                   setNewFileNameInput('');
                                   setCreatingNewFile(false);
                                 }}
-                                className="flex items-center gap-1.5 pl-3 pr-2 py-0.5"
+                                className="flex items-center gap-1.5 pl-3 pr-2 py-1.5 md:py-0.5 min-h-[44px] md:min-h-0"
                               >
                                 <SetiFileIcon extension="tsx" className="w-4 h-4 shrink-0" />
                                 <input
@@ -2029,7 +1738,7 @@ export default function App() {
                                   onChange={(e) => setNewFileNameInput(e.target.value)}
                                   onBlur={() => setCreatingNewFile(false)}
                                   placeholder="new-page.tsx"
-                                  className="w-full px-1.5 py-0.5 bg-[#3C3C3C] border border-[#0078D4] text-xs text-white focus:outline-none"
+                                  className="w-full px-1.5 py-1 md:py-0.5 bg-[#3C3C3C] border border-[#0078D4] text-xs text-white focus:outline-none"
                                 />
                               </form>
                             )}
@@ -2064,7 +1773,7 @@ export default function App() {
                                       });
                                     }}
                                     title={`${file.path} — ${file.navLabel} Page (${file.description})`}
-                                    className={`group w-full flex items-center justify-between pl-3 pr-2 py-0.5 text-left cursor-pointer text-[13px] ${
+                                    className={`group w-full min-h-[44px] md:min-h-0 flex items-center justify-between pl-3 pr-2 py-2 md:py-0.5 text-left cursor-pointer text-[13px] ${
                                       active
                                         ? 'bg-[#04395E] text-white outline-1 -outline-offset-1 outline-[#0078D4]'
                                         : 'hover:bg-[#2A2D2E] text-[#CCCCCC]'
@@ -2094,7 +1803,7 @@ export default function App() {
                                           setEditorMode('split');
                                         }}
                                         title="Open to the Side (Split Editor Right)"
-                                        className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-[#3C3C3C] text-[#CCCCCC] hover:text-white flex items-center"
+                                        className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-7 h-7 md:w-auto md:h-auto p-1 md:p-0.5 rounded hover:bg-[#3C3C3C] text-[#CCCCCC] hover:text-white flex items-center justify-center"
                                       >
                                         <Codicon
                                           name="split-horizontal"
@@ -2135,7 +1844,7 @@ export default function App() {
                                         isCustom: true,
                                       });
                                     }}
-                                    className={`group w-full flex items-center justify-between pl-3 pr-2 py-0.5 text-left cursor-pointer text-[13px] ${
+                                    className={`group w-full min-h-[44px] md:min-h-0 flex items-center justify-between pl-3 pr-2 py-2 md:py-0.5 text-left cursor-pointer text-[13px] ${
                                       active
                                         ? 'bg-[#04395E] text-white outline-1 -outline-offset-1 outline-[#0078D4]'
                                         : 'hover:bg-[#2A2D2E] text-[#CCCCCC]'
@@ -2161,7 +1870,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => setProjectsFolderExpanded((prev) => !prev)}
-                          className="w-full flex items-center justify-between pl-2.5 pr-2 py-0.5 hover:bg-[#2A2D2E] text-left cursor-pointer text-[13px] text-[#CCCCCC]"
+                          className="w-full min-h-[44px] md:min-h-0 flex items-center justify-between pl-2.5 pr-2 py-2 md:py-0.5 hover:bg-[#2A2D2E] text-left cursor-pointer text-[13px] text-[#CCCCCC]"
                         >
                           <span className="flex items-center gap-1.5 truncate">
                             <Codicon
@@ -2204,7 +1913,7 @@ export default function App() {
                                       setSelectedProject(proj);
                                     }}
                                     title={`Open ${proj.title} (${proj.category}) Case Study`}
-                                    className={`group w-full flex items-center justify-between pl-3 pr-2 py-0.5 text-left cursor-pointer text-[13px] ${
+                                    className={`group w-full min-h-[44px] md:min-h-0 flex items-center justify-between pl-3 pr-2 py-2 md:py-0.5 text-left cursor-pointer text-[13px] ${
                                       isProjActive
                                         ? 'bg-[#04395E] text-white outline-1 -outline-offset-1 outline-[#0078D4]'
                                         : 'hover:bg-[#2A2D2E] text-[#CCCCCC]'
@@ -2223,79 +1932,11 @@ export default function App() {
                           </div>
                         )}
 
-                        {/* SUBFOLDER 1C: src/components (Interactive Section Components) */}
-                        <button
-                          type="button"
-                          onClick={() => setComponentsFolderExpanded((prev) => !prev)}
-                          className="w-full flex items-center justify-between pl-2.5 pr-2 py-0.5 hover:bg-[#2A2D2E] text-left cursor-pointer text-[13px] text-[#CCCCCC]"
-                        >
-                          <span className="flex items-center gap-1.5 truncate">
-                            <Codicon
-                              name={componentsFolderExpanded ? 'chevron-down' : 'chevron-right'}
-                              className="!text-[14px] text-[#CCCCCC] shrink-0"
-                            />
-                            <Codicon
-                              name={componentsFolderExpanded ? 'folder-opened' : 'folder'}
-                              className="!text-[14px] text-[#89D185] shrink-0"
-                            />
-                            <span className="truncate">components</span>
-                          </span>
-                          <span className="text-[10px] text-[#858585] font-mono">4</span>
-                        </button>
-
-                        {componentsFolderExpanded && (
-                          <div className="ml-[17px] border-l border-[#2B2B2B]">
-                            {[
-                              {
-                                name: 'HeroProfileCard.tsx',
-                                targetFile: 'overview.tsx',
-                                line: 12,
-                              },
-                              {
-                                name: 'SkillsMarketplace.tsx',
-                                targetFile: 'skills.json',
-                                line: 5,
-                              },
-                              {
-                                name: 'AcademicTimeline.tsx',
-                                targetFile: 'education.md',
-                                line: 3,
-                              },
-                              {
-                                name: 'GuestbookCloud.tsx',
-                                targetFile: 'contact.tsx',
-                                line: 30,
-                              },
-                            ]
-                              .filter((comp) => {
-                                const q = explorerFilterQuery.toLowerCase().trim();
-                                if (!q) return true;
-                                return comp.name.toLowerCase().includes(q);
-                              })
-                              .map((comp) => (
-                                <button
-                                  key={comp.name}
-                                  type="button"
-                                  onClick={() => {
-                                    handleOpenFile(comp.targetFile);
-                                    setCursorPos({ line: comp.line, col: 1 });
-                                  }}
-                                  className="w-full flex items-center justify-between pl-3 pr-2 py-0.5 hover:bg-[#2A2D2E] text-left cursor-pointer text-[13px] text-[#CCCCCC]"
-                                >
-                                  <span className="flex items-center gap-1.5 truncate">
-                                    <SetiFileIcon extension="tsx" className="w-4 h-4 shrink-0" />
-                                    <span className="truncate">{comp.name}</span>
-                                  </span>
-                                </button>
-                              ))}
-                          </div>
-                        )}
-
                         {/* User-created custom folders inside src/ */}
                         {customFolders.map((folderName) => (
                           <div
                             key={folderName}
-                            className="w-full flex items-center gap-1.5 pl-2.5 pr-2 py-0.5 hover:bg-[#2A2D2E] text-left text-[13px] text-[#CCCCCC]"
+                            className="w-full min-h-[44px] md:min-h-0 flex items-center gap-1.5 pl-2.5 pr-2 py-2 md:py-0.5 hover:bg-[#2A2D2E] text-left text-[13px] text-[#CCCCCC]"
                           >
                             <Codicon
                               name="chevron-right"
@@ -2311,65 +1952,11 @@ export default function App() {
                       </div>
                     )}
 
-                    {/* ROOT FOLDER 2: public (Static Assets & Resume) */}
-                    <button
-                      type="button"
-                      onClick={() => setPublicFolderExpanded((prev) => !prev)}
-                      className="w-full flex items-center gap-1.5 pl-3 pr-2 py-0.5 hover:bg-[#2A2D2E] text-left cursor-pointer text-[13px] text-[#CCCCCC]"
-                    >
-                      <Codicon
-                        name={publicFolderExpanded ? 'chevron-down' : 'chevron-right'}
-                        className="!text-[14px] text-[#CCCCCC] shrink-0"
-                      />
-                      <Codicon
-                        name={publicFolderExpanded ? 'folder-opened' : 'folder'}
-                        className="!text-[14px] text-[#75BEFF] shrink-0"
-                      />
-                      <span className="truncate font-medium">public</span>
-                    </button>
-
-                    {publicFolderExpanded && (
-                      <div className="ml-[19px] border-l border-[#2B2B2B]">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleOpenFile('overview.tsx');
-                            setCursorPos({ line: 12, col: 1 });
-                          }}
-                          className="w-full flex items-center justify-between pl-3 pr-2 py-0.5 hover:bg-[#2A2D2E] text-left cursor-pointer text-[13px] text-[#CCCCCC]"
-                        >
-                          <span className="flex items-center gap-1.5 truncate">
-                            <Codicon
-                              name="file-media"
-                              className="!text-[14px] text-[#B180D7] shrink-0"
-                            />
-                            <span className="truncate">profile.webp</span>
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleOpenFile('education.md');
-                            setCursorPos({ line: 3, col: 1 });
-                          }}
-                          className="w-full flex items-center justify-between pl-3 pr-2 py-0.5 hover:bg-[#2A2D2E] text-left cursor-pointer text-[13px] text-[#CCCCCC]"
-                        >
-                          <span className="flex items-center gap-1.5 truncate">
-                            <Codicon
-                              name="file-pdf"
-                              className="!text-[14px] text-[#F14C4C] shrink-0"
-                            />
-                            <span className="truncate">Mustafa_Hossain_Resume.pdf</span>
-                          </span>
-                        </button>
-                      </div>
-                    )}
-
-                    {/* ROOT FOLDER 3: config (Workspace Configuration & Settings) */}
+                    {/* ROOT FOLDER 2: config (Workspace Configuration & Settings) */}
                     <button
                       type="button"
                       onClick={() => setConfigFolderExpanded((prev) => !prev)}
-                      className="w-full flex items-center gap-1.5 pl-3 pr-2 py-0.5 hover:bg-[#2A2D2E] text-left cursor-pointer text-[13px] text-[#CCCCCC]"
+                      className="w-full min-h-[44px] md:min-h-0 flex items-center gap-1.5 pl-3 pr-2 py-2 md:py-0.5 hover:bg-[#2A2D2E] text-left cursor-pointer text-[13px] text-[#CCCCCC]"
                     >
                       <Codicon
                         name={configFolderExpanded ? 'chevron-down' : 'chevron-right'}
@@ -2393,7 +1980,7 @@ export default function App() {
                           .map((file) => {
                             const active = activeFile === file.id;
                             const unreadCount =
-                              file.id === 'messages-inbox.json'
+                              isOwner && file.id === 'messages-inbox.json'
                                 ? messages.filter((m) => !m.read).length
                                 : 0;
                             return (
@@ -2409,7 +1996,7 @@ export default function App() {
                                     filePath: file.path,
                                   });
                                 }}
-                                className={`group w-full flex items-center justify-between pl-3 pr-2 py-0.5 text-left cursor-pointer text-[13px] ${
+                                className={`group w-full min-h-[44px] md:min-h-0 flex items-center justify-between pl-3 pr-2 py-2 md:py-0.5 text-left cursor-pointer text-[13px] ${
                                   active
                                     ? 'bg-[#04395E] text-white outline-1 -outline-offset-1 outline-[#0078D4]'
                                     : 'hover:bg-[#2A2D2E] text-[#CCCCCC]'
@@ -2424,6 +2011,13 @@ export default function App() {
                                   <span className="truncate">{file.name}</span>
                                 </span>
                                 <span className="flex items-center gap-1 shrink-0">
+                                  {file.id === 'messages-inbox.json' && !isOwner && (
+                                    <Codicon
+                                      name="lock"
+                                      className="!text-[11px] text-[#858585]"
+                                      title="Private Owner Inbox — Restricted to MD Mustafa Hossain"
+                                    />
+                                  )}
                                   {unreadCount > 0 && (
                                     <span className="px-1.5 py-0.2 rounded-full bg-[#0078D4] text-white text-[10px] font-mono">
                                       {unreadCount}
@@ -2437,7 +2031,7 @@ export default function App() {
                                       setEditorMode('split');
                                     }}
                                     title="Open to the Side (Split Editor Right)"
-                                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-[#3C3C3C] text-[#CCCCCC] hover:text-white flex items-center"
+                                    className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-7 h-7 md:w-auto md:h-auto p-1 md:p-0.5 rounded hover:bg-[#3C3C3C] text-[#CCCCCC] hover:text-white flex items-center justify-center"
                                   >
                                     <Codicon name="split-horizontal" className="!text-[12px]" />
                                   </button>
@@ -2458,7 +2052,7 @@ export default function App() {
                               filePath: 'config/settings.json',
                             });
                           }}
-                          className={`group w-full flex items-center justify-between pl-3 pr-2 py-0.5 text-left cursor-pointer text-[13px] ${
+                          className={`group w-full min-h-[44px] md:min-h-0 flex items-center justify-between pl-3 pr-2 py-2 md:py-0.5 text-left cursor-pointer text-[13px] ${
                             activeFile === 'settings'
                               ? 'bg-[#04395E] text-white outline-1 -outline-offset-1 outline-[#0078D4]'
                               : 'hover:bg-[#2A2D2E] text-[#CCCCCC]'
@@ -2475,93 +2069,6 @@ export default function App() {
                   </div>
                 )}
               </div>
-
-              {/* Section 3: OUTLINE with Interactive Symbol Jumping */}
-              {showOutline && (
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => setOutlineExpanded((prev) => !prev)}
-                    className="w-full flex items-center gap-1 px-1.5 py-1 font-bold text-[11px] uppercase tracking-wide border-t border-[#2B2B2B] hover:bg-[#2A2D2E] cursor-pointer"
-                  >
-                    <Codicon
-                      name={outlineExpanded ? 'chevron-down' : 'chevron-right'}
-                      className="!text-[14px]"
-                    />
-                    <span>OUTLINE</span>
-                  </button>
-
-                  {outlineExpanded && (
-                    <div className="py-1 pl-3 pr-2 space-y-0.5 text-[12px] text-[#CCCCCC]">
-                      {(
-                        currentFileMeta.symbols || [
-                          { name: currentFileMeta.name, kind: 'method' as const, line: 1 },
-                        ]
-                      ).map((sym) => (
-                        <button
-                          key={sym.name}
-                          type="button"
-                          onClick={() => setCursorPos({ line: sym.line, col: 1 })}
-                          className="w-full flex items-center justify-between px-2 py-0.5 rounded hover:bg-[#2A2D2E] text-left cursor-pointer"
-                        >
-                          <span className="flex items-center gap-1.5 truncate">
-                            <Codicon
-                              name={`symbol-${sym.kind}`}
-                              className={`!text-[14px] ${
-                                sym.kind === 'method'
-                                  ? 'text-[#B180D7]'
-                                  : sym.kind === 'constant'
-                                  ? 'text-[#4FC1FF]'
-                                  : 'text-[#75BEFF]'
-                              }`}
-                            />
-                            <span className="truncate">{sym.name}</span>
-                          </span>
-                          <span className="text-[10px] font-mono text-[#858585]">:{sym.line}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Section 4: TIMELINE */}
-              {showTimeline && (
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => setTimelineExpanded((prev) => !prev)}
-                    className="w-full flex items-center gap-1 px-1.5 py-1 font-bold text-[11px] uppercase tracking-wide border-t border-[#2B2B2B] hover:bg-[#2A2D2E] cursor-pointer"
-                  >
-                    <Codicon
-                      name={timelineExpanded ? 'chevron-down' : 'chevron-right'}
-                      className="!text-[14px]"
-                    />
-                    <span>TIMELINE</span>
-                  </button>
-                  {timelineExpanded && (
-                    <div className="py-1 pl-4 pr-2 space-y-1 text-[11px] text-[#CCCCCC]">
-                      {commitHistory.map((c) => (
-                        <button
-                          key={c.hash}
-                          type="button"
-                          onClick={() => {
-                            setTerminalOpen(true);
-                            setActivePanelTab('output');
-                          }}
-                          className="w-full flex items-center justify-between px-1.5 py-0.5 rounded hover:bg-[#2A2D2E] text-left cursor-pointer"
-                        >
-                          <span className="flex items-center gap-1.5 truncate">
-                            <Codicon name="git-commit" className="!text-[13px] text-[#0078D4]" />
-                            <span className="truncate">{c.message}</span>
-                          </span>
-                          <span className="text-[10px] text-[#858585] shrink-0 ml-1">{c.time}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* Official VS Code Explorer Right-Click Context Menu */}
               {explorerContextMenu && (
@@ -2583,7 +2090,7 @@ export default function App() {
                         handleOpenFile(explorerContextMenu.fileId);
                         setExplorerContextMenu(null);
                       }}
-                      className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#04395E] hover:text-white text-left cursor-pointer"
+                      className="w-full min-h-[44px] md:min-h-0 flex items-center justify-between px-3 py-2.5 md:py-1.5 hover:bg-[#04395E] hover:text-white text-left cursor-pointer"
                     >
                       <span>Open Page / Editor</span>
                       <span className="font-mono text-[10px] text-[#858585]">Enter</span>
@@ -2595,7 +2102,7 @@ export default function App() {
                         setEditorMode('split');
                         setExplorerContextMenu(null);
                       }}
-                      className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#04395E] hover:text-white text-left cursor-pointer"
+                      className="w-full min-h-[44px] md:min-h-0 flex items-center justify-between px-3 py-2.5 md:py-1.5 hover:bg-[#04395E] hover:text-white text-left cursor-pointer"
                     >
                       <span>Open to the Side</span>
                       <span className="font-mono text-[10px] text-[#858585]">Ctrl+Enter</span>
@@ -2606,9 +2113,6 @@ export default function App() {
                       onClick={() => {
                         navigator.clipboard?.writeText(
                           `/workspace/mustafa-dev-portfolio/${explorerContextMenu.filePath}`
-                        );
-                        appendSyncLog(
-                          `[Clipboard] Copied path: /workspace/mustafa-dev-portfolio/${explorerContextMenu.filePath}`
                         );
                         setExplorerContextMenu(null);
                       }}
@@ -2621,9 +2125,6 @@ export default function App() {
                       type="button"
                       onClick={() => {
                         navigator.clipboard?.writeText(explorerContextMenu.filePath);
-                        appendSyncLog(
-                          `[Clipboard] Copied relative path: ${explorerContextMenu.filePath}`
-                        );
                         setExplorerContextMenu(null);
                       }}
                       className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#04395E] hover:text-white text-left cursor-pointer"
@@ -2659,95 +2160,54 @@ export default function App() {
             </div>
           )}
 
-          {/* VIEW 2: GLOBAL WORKSPACE SEARCH & REPLACE */}
+          {/* VIEW 2: GLOBAL WORKSPACE SEARCH */}
           {activityView === 'search' && (
             <div className="flex-1 flex flex-col p-2.5 space-y-2.5 overflow-y-auto text-xs">
-              <div className="flex items-start gap-1">
-                <button
-                  type="button"
-                  onClick={() => setSearchReplaceExpanded((prev) => !prev)}
-                  title="Toggle Replace"
-                  className="p-1 mt-0.5 rounded hover:bg-[#2A2D2E] text-[#CCCCCC] cursor-pointer"
-                >
-                  <Codicon
-                    name={searchReplaceExpanded ? 'chevron-down' : 'chevron-right'}
-                    className="!text-[13px]"
-                  />
-                </button>
-
-                <div className="flex-1 space-y-1.5">
-                  <div className="flex items-center bg-[#3C3C3C] border border-[#0078D4] rounded-xs px-1.5 py-1">
-                    <input
-                      type="text"
-                      value={globalSearchQuery}
-                      onChange={(e) => setGlobalSearchQuery(e.target.value)}
-                      placeholder="Search"
-                      className="flex-1 bg-transparent text-xs text-white placeholder-[#A0A0A0] focus:outline-none"
-                    />
-                    <div className="flex items-center gap-0.5 shrink-0 font-mono text-[11px]">
-                      <button
-                        type="button"
-                        onClick={() => setMatchCase((p) => !p)}
-                        title="Match Case (Alt+C)"
-                        className={`px-1 rounded cursor-pointer ${
-                          matchCase
-                            ? 'bg-[#0078D4] text-white'
-                            : 'text-[#CCCCCC] hover:bg-[#4E4E4E]'
-                        }`}
-                      >
-                        Aa
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setMatchWholeWord((p) => !p)}
-                        title="Match Whole Word (Alt+W)"
-                        className={`px-1 rounded cursor-pointer ${
-                          matchWholeWord
-                            ? 'bg-[#0078D4] text-white'
-                            : 'text-[#CCCCCC] hover:bg-[#4E4E4E]'
-                        }`}
-                      >
-                        ab
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setUseRegex((p) => !p)}
-                        title="Use Regular Expression (Alt+R)"
-                        className={`px-1 rounded cursor-pointer ${
-                          useRegex
-                            ? 'bg-[#0078D4] text-white'
-                            : 'text-[#CCCCCC] hover:bg-[#4E4E4E]'
-                        }`}
-                      >
-                        .*
-                      </button>
-                    </div>
-                  </div>
-
-                  {searchReplaceExpanded && (
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="text"
-                        value={globalReplaceQuery}
-                        onChange={(e) => setGlobalReplaceQuery(e.target.value)}
-                        placeholder="Replace"
-                        className="flex-1 px-1.5 py-1 rounded-xs bg-[#3C3C3C] border border-[#3C3C3C] focus:border-[#0078D4] text-xs text-white placeholder-[#A0A0A0] focus:outline-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          appendSyncLog(
-                            `[Search] Replaced occurrences of "${globalSearchQuery}" with "${globalReplaceQuery}"`
-                          );
-                          setGlobalReplaceQuery('');
-                        }}
-                        title="Replace All (Ctrl+Alt+Enter)"
-                        className="p-1 rounded bg-[#2B2B2B] hover:bg-[#3C3C3C] text-[#CCCCCC] cursor-pointer"
-                      >
-                        <Codicon name="replace-all" className="!text-[13px]" />
-                      </button>
-                    </div>
-                  )}
+              <div className="flex items-center bg-[#3C3C3C] border border-[#0078D4] rounded-xs px-1.5 py-1">
+                <input
+                  type="text"
+                  value={globalSearchQuery}
+                  onChange={(e) => setGlobalSearchQuery(e.target.value)}
+                  placeholder="Search portfolio files..."
+                  className="flex-1 bg-transparent text-xs text-white placeholder-[#A0A0A0] focus:outline-none"
+                />
+                <div className="flex items-center gap-0.5 shrink-0 font-mono text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setMatchCase((p) => !p)}
+                    title="Match Case (Alt+C)"
+                    className={`px-1 rounded cursor-pointer ${
+                      matchCase
+                        ? 'bg-[#0078D4] text-white'
+                        : 'text-[#CCCCCC] hover:bg-[#4E4E4E]'
+                    }`}
+                  >
+                    Aa
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMatchWholeWord((p) => !p)}
+                    title="Match Whole Word (Alt+W)"
+                    className={`px-1 rounded cursor-pointer ${
+                      matchWholeWord
+                        ? 'bg-[#0078D4] text-white'
+                        : 'text-[#CCCCCC] hover:bg-[#4E4E4E]'
+                    }`}
+                  >
+                    ab
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUseRegex((p) => !p)}
+                    title="Use Regular Expression (Alt+R)"
+                    className={`px-1 rounded cursor-pointer ${
+                      useRegex
+                        ? 'bg-[#0078D4] text-white'
+                        : 'text-[#CCCCCC] hover:bg-[#4E4E4E]'
+                    }`}
+                  >
+                    .*
+                  </button>
                 </div>
               </div>
 
@@ -2787,211 +2247,7 @@ export default function App() {
             </div>
           )}
 
-          {/* VIEW 3: SOURCE CONTROL (GIT STAGING, COMMITTING & CLOUD SYNC) */}
-          {activityView === 'scm' && (
-            <div className="flex-1 flex flex-col p-2.5 space-y-3 overflow-y-auto text-xs">
-              <div className="space-y-1.5">
-                <input
-                  type="text"
-                  value={scmMessage}
-                  onChange={(e) => setScmMessage(e.target.value)}
-                  placeholder={`Message (Ctrl+Enter to commit on "${gitBranch}")`}
-                  className="w-full px-2 py-1.5 rounded-xs bg-[#3C3C3C] border border-[#3C3C3C] focus:border-[#0078D4] text-xs text-white placeholder-[#A0A0A0] focus:outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    const msg =
-                      scmMessage.trim() || `chore: sync workspace revision #${syncStats.syncCount + 1}`;
-                    setCommitHistory((prev) => [
-                      {
-                        hash: Math.random().toString(16).slice(2, 9),
-                        message: msg,
-                        time: 'Just now',
-                      },
-                      ...prev,
-                    ]);
-                    handleTriggerSync(false);
-                    setScmMessage('');
-                  }}
-                  className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xs bg-[#0078D4] hover:bg-[#1084DF] text-white font-medium text-xs transition-colors cursor-pointer"
-                >
-                  <Codicon name="check" className="!text-[13px]" />
-                  <span>Commit &amp; Sync (#{syncStats.syncCount})</span>
-                </button>
-              </div>
-
-              {/* Staged Changes */}
-              {stagedFiles.length > 0 && (
-                <div className="space-y-1 border-t border-[#2B2B2B] pt-2">
-                  <div className="text-[11px] font-bold uppercase text-[#BBBBBB] px-1">
-                    STAGED CHANGES ({stagedFiles.length})
-                  </div>
-                  {stagedFiles.map((fId) => (
-                    <div
-                      key={fId}
-                      onClick={() => handleOpenFile(fId)}
-                      className="group flex items-center justify-between px-2 py-1 rounded hover:bg-[#2A2D2E] cursor-pointer"
-                    >
-                      <span className="flex items-center gap-1.5 truncate">
-                        <SetiFileIcon fileId={fId} extension="tsx" className="w-4 h-4 shrink-0" />
-                        <span className="truncate">{fId}</span>
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setStagedFiles((prev) => prev.filter((item) => item !== fId));
-                          }}
-                          title="Unstage Changes"
-                          className="opacity-0 group-hover:opacity-100 hover:text-white"
-                        >
-                          <Codicon name="remove" className="!text-[12px]" />
-                        </button>
-                        <span className="font-mono text-[11px] text-[#73C991]">A</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Working Tree Changes */}
-              <div className="space-y-1 border-t border-[#2B2B2B] pt-2">
-                <div className="text-[11px] font-bold uppercase text-[#BBBBBB] px-1">
-                  CHANGES (3 PRODUCTION APPS)
-                </div>
-                {projects.map((proj) => (
-                  <div
-                    key={proj.id}
-                    onClick={() => setSelectedProject(proj)}
-                    className="group w-full flex items-center justify-between px-2 py-1.5 rounded hover:bg-[#2A2D2E] text-left cursor-pointer"
-                  >
-                    <span className="flex items-center gap-2 truncate">
-                      <SetiFileIcon extension="tsx" className="w-4 h-4 shrink-0" />
-                      <span className="truncate">{proj.title}.tsx</span>
-                    </span>
-                    <span className="flex items-center gap-1.5 font-mono text-[11px] shrink-0">
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const fname = `${proj.title}.tsx`;
-                          if (!stagedFiles.includes(fname)) {
-                            setStagedFiles((prev) => [...prev, fname]);
-                          }
-                        }}
-                        title="Stage Changes"
-                        className="opacity-0 group-hover:opacity-100 hover:text-white"
-                      >
-                        <Codicon name="add" className="!text-[12px]" />
-                      </button>
-                      <span className="text-[#DCDCAA]">★{proj.stars}</span>
-                      <span className="text-[#E2C08D]">M</span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* VIEW 4: RUN AND DEBUG (VARIABLES, WATCH, CALL STACK & BREAKPOINTS) */}
-          {activityView === 'debug' && (
-            <div className="flex-1 flex flex-col p-2.5 space-y-3 overflow-y-auto text-xs">
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsDebugging(true);
-                    setTerminalOpen(true);
-                    setActivePanelTab('debug');
-                  }}
-                  className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xs bg-[#0078D4] hover:bg-[#1084DF] text-white font-medium text-xs w-full cursor-pointer"
-                >
-                  <Codicon name="debug-start" className="!text-[14px] text-[#89D185]" />
-                  <span>{isDebugging ? 'Debugging Active (F5)' : 'Launch Portfolio (Chrome)'}</span>
-                </button>
-              </div>
-
-              <div className="space-y-1 border-t border-[#2B2B2B] pt-2 font-mono text-[11px]">
-                <div className="font-sans font-bold uppercase text-[#BBBBBB] pb-1">VARIABLES</div>
-                <div>
-                  <span className="text-[#9CDCFE]">developer</span>:{' '}
-                  <span className="text-[#CE9178]">&quot;{DEVELOPER_PROFILE.name}&quot;</span>
-                </div>
-                <div>
-                  <span className="text-[#9CDCFE]">bcaCgpa</span>:{' '}
-                  <span className="text-[#B5CEA8]">9.09</span>
-                </div>
-                <div>
-                  <span className="text-[#9CDCFE]">activeEditor</span>:{' '}
-                  <span className="text-[#CE9178]">&quot;{activeFile}&quot;</span>
-                </div>
-                <div>
-                  <span className="text-[#9CDCFE]">cloudRevisions</span>:{' '}
-                  <span className="text-[#B5CEA8]">{syncStats.syncCount}</span>
-                </div>
-              </div>
-
-              {/* WATCH EXPRESSIONS */}
-              <div className="space-y-1 border-t border-[#2B2B2B] pt-2 font-mono text-[11px]">
-                <div className="flex items-center justify-between font-sans font-bold uppercase text-[#BBBBBB] pb-1">
-                  <span>WATCH</span>
-                  <button
-                    type="button"
-                    onClick={() => setAddingWatch(true)}
-                    title="Add Expression"
-                    className="hover:text-white cursor-pointer"
-                  >
-                    <Codicon name="add" className="!text-[13px]" />
-                  </button>
-                </div>
-                {watchExpressions.map((w, idx) => (
-                  <div key={idx} className="truncate">
-                    <span className="text-[#9CDCFE]">{w.expr}</span>:{' '}
-                    <span className="text-[#4EC9B0]">{w.value}</span>
-                  </div>
-                ))}
-                {addingWatch && (
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (newWatchExpr.trim()) {
-                        setWatchExpressions((prev) => [
-                          ...prev,
-                          { expr: newWatchExpr.trim(), value: '"Evaluated: OK"' },
-                        ]);
-                      }
-                      setNewWatchExpr('');
-                      setAddingWatch(false);
-                    }}
-                  >
-                    <input
-                      type="text"
-                      autoFocus
-                      value={newWatchExpr}
-                      onChange={(e) => setNewWatchExpr(e.target.value)}
-                      onBlur={() => setAddingWatch(false)}
-                      placeholder="Expression to watch..."
-                      className="w-full px-1.5 py-0.5 bg-[#3C3C3C] border border-[#0078D4] text-white text-[11px] focus:outline-none"
-                    />
-                  </form>
-                )}
-              </div>
-
-              <div className="space-y-1 border-t border-[#2B2B2B] pt-2 font-mono text-[11px]">
-                <div className="font-sans font-bold uppercase text-[#BBBBBB] pb-1">CALL STACK</div>
-                <div className="flex items-center gap-1.5 text-[#CCCCCC]">
-                  <Codicon name="debug-stackframe" className="!text-[13px] text-[#DCDCAA]" />
-                  <span className="truncate">
-                    {currentFileMeta.name}:{cursorPos.line}:{cursorPos.col}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* VIEW 5: EXTENSIONS (OFFICIAL DEVICON MULTI-COLOR SVGS + MARKETPLACE SEARCH) */}
+          {/* VIEW 3: EXTENSIONS (OFFICIAL DEVICON MULTI-COLOR SVGS + MARKETPLACE SEARCH) */}
           {activityView === 'extensions' && (
             <div className="flex-1 flex flex-col overflow-hidden p-2 space-y-2 text-xs">
               <div className="flex items-center bg-[#3C3C3C] border border-[#0078D4] rounded-xs px-2 py-1">
@@ -3021,7 +2277,7 @@ export default function App() {
                       }`}
                     >
                       <div className="p-1.5 rounded bg-[#252526] border border-[#2B2B2B] shrink-0 mt-0.5 flex items-center justify-center">
-                        <OfficialSkillIcon skillId={skill.id} className="w-6 h-6" />
+                        <OfficialSkillIcon skillId={skill.id} className="w-6 h-6" theme={theme} />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
@@ -3048,16 +2304,21 @@ export default function App() {
               </div>
             </div>
           )}
+
+          {/* VIEW 4: GEMINI AI CHAT INTERFACE */}
+          {activityView === 'gemini' && (
+            <GeminiChatPanel onOpenFile={handleOpenFile} theme={theme} />
+          )}
         </aside>
 
         {/* 3. EDITOR GROUP (Connected Tab Strip + Interactive Breadcrumbs + Find Widget + Editor Canvas + Minimap + Bottom Panel) */}
         <div className="flex-1 flex flex-col min-w-0 relative">
-          {/* Official VS Code Editor Group Header & Connected Tabs */}
+          {/* Official VS Code Editor Group Header & Connected Tabs (44px height on mobile for touch targets, 35px on desktop) */}
           <div
-            className={`h-[35px] flex items-center justify-between border-b ${borderCol} ${chromeBg} shrink-0`}
+            className={`h-11 md:h-[35px] flex items-center justify-between border-b ${borderCol} ${chromeBg} shrink-0 overflow-hidden`}
           >
             {/* Connected File Tabs with Official Seti File Icons */}
-            <div className="flex items-center h-full overflow-x-auto">
+            <div className="flex items-center h-full overflow-x-auto overflow-y-hidden no-scrollbar min-w-0">
               {openTabs.map((tabId) => {
                 const tabFile = getTabMeta(tabId);
                 const active = activeFile === tabId;
@@ -3067,7 +2328,7 @@ export default function App() {
                     onClick={() => handleOpenFile(tabId)}
                     role="tab"
                     aria-selected={active}
-                    className={`group h-full inline-flex items-center gap-2 px-3 border-r ${borderCol} text-[13px] cursor-pointer transition-none whitespace-nowrap shrink-0 relative ${
+                    className={`group h-full inline-flex items-center gap-2 px-3.5 md:px-3 border-r ${borderCol} text-[13px] cursor-pointer transition-none whitespace-nowrap shrink-0 relative ${
                       active
                         ? isDark
                           ? 'bg-[#1F1F1F] text-white'
@@ -3079,7 +2340,7 @@ export default function App() {
                   >
                     {/* VS Code Blue Active Tab Top Indicator */}
                     {active && (
-                      <span className="absolute top-0 left-0 right-0 h-[1px] bg-[#0078D4]" />
+                      <span className="absolute top-0 left-0 right-0 h-[2px] md:h-[1px] bg-[#0078D4]" />
                     )}
                     <SetiFileIcon
                       fileId={tabFile.id}
@@ -3092,8 +2353,8 @@ export default function App() {
                         type="button"
                         onClick={(e) => handleCloseTab(e, tabId)}
                         aria-label={`Close ${tabFile.name}`}
-                        className={`ml-1 p-0.5 rounded hover:bg-[#2A2D2E] flex items-center justify-center ${
-                          active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                        className={`ml-0.5 md:ml-1 -mr-1.5 md:mr-0 min-w-[32px] min-h-[32px] md:min-w-0 md:min-h-0 p-1.5 md:p-0.5 rounded hover:bg-[#2A2D2E] flex items-center justify-center ${
+                          active ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'
                         }`}
                       >
                         <Codicon name="close" className="!text-[13px]" />
@@ -3105,186 +2366,76 @@ export default function App() {
             </div>
 
             {/* Official VS Code Editor Actions Toolbar on the Right of Tab Bar */}
-            <div className="flex items-center gap-1 px-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setEditorMode('hybrid')}
-                title="Open Hybrid Preview (Code Gutter + Interactive Cards)"
-                className={`p-1 rounded flex items-center justify-center cursor-pointer ${
-                  editorMode === 'hybrid'
-                    ? 'bg-[#2A2D2E] text-white'
-                    : 'text-[#868686] hover:bg-[#2A2D2E] hover:text-white'
-                }`}
-              >
-                <Codicon name="open-preview" className="!text-[15px]" />
-              </button>
+            <div className="flex items-center gap-1 px-1.5 md:px-2 shrink-0">
+              <div className="flex items-center rounded bg-[#252526] p-0.5 border border-[#2B2B2B]">
+                <button
+                  type="button"
+                  onClick={() => setEditorMode('hybrid')}
+                  title="Visual Portfolio Preview"
+                  className={`min-h-[32px] md:min-h-0 px-2.5 py-1 rounded-xs text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors ${
+                    editorMode === 'hybrid'
+                      ? 'bg-[#0078D4] text-white'
+                      : 'text-[#868686] hover:text-white'
+                  }`}
+                >
+                  <Codicon name="open-preview" className="!text-[13px]" />
+                  <span className="hidden sm:inline">Preview</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setEditorMode('code')}
-                title="View Raw Source Code"
-                className={`p-1 rounded flex items-center justify-center cursor-pointer ${
-                  editorMode === 'code'
-                    ? 'bg-[#2A2D2E] text-white'
-                    : 'text-[#868686] hover:bg-[#2A2D2E] hover:text-white'
-                }`}
-              >
-                <Codicon name="code" className="!text-[15px]" />
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setEditorMode('code')}
+                  title="View Raw Source Code"
+                  className={`min-h-[32px] md:min-h-0 px-2.5 py-1 rounded-xs text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors ${
+                    editorMode === 'code'
+                      ? 'bg-[#0078D4] text-white'
+                      : 'text-[#868686] hover:text-white'
+                  }`}
+                >
+                  <Codicon name="code" className="!text-[13px]" />
+                  <span className="hidden sm:inline">Code</span>
+                </button>
+              </div>
 
               <button
                 type="button"
                 onClick={() => setEditorMode((prev) => (prev === 'split' ? 'hybrid' : 'split'))}
                 title="Split Editor Right (Ctrl+\)"
-                className={`p-1 rounded flex items-center justify-center cursor-pointer ${
+                className={`min-w-[40px] min-h-[40px] md:min-w-0 md:min-h-0 p-2 md:p-1.5 rounded flex items-center justify-center cursor-pointer ${
                   editorMode === 'split'
-                    ? 'bg-[#2A2D2E] text-white'
+                    ? 'bg-[#0078D4] text-white'
                     : 'text-[#868686] hover:bg-[#2A2D2E] hover:text-white'
                 }`}
               >
                 <Codicon name="split-horizontal" className="!text-[15px]" />
               </button>
-
-              <button
-                type="button"
-                onClick={() => openQuickPick('> ')}
-                title="More Actions..."
-                className="p-1 rounded text-[#868686] hover:bg-[#2A2D2E] hover:text-white flex items-center justify-center cursor-pointer"
-              >
-                <Codicon name="ellipsis" className="!text-[15px]" />
-              </button>
             </div>
           </div>
 
-          {/* Official VS Code 22px Interactive Breadcrumbs Bar (Toggleable via Settings/View menu) */}
+          {/* Clean VS Code 22px Path Breadcrumbs Bar */}
           {settings.breadcrumbsEnabled && (
             <div
-              className={`h-[22px] px-2 sm:px-4 flex items-center justify-between border-b ${borderCol} ${editorBg} text-[11px] sm:text-[12px] font-sans text-[#868686] shrink-0 relative z-20`}
+              className={`h-[22px] px-2 sm:px-4 flex items-center justify-between border-b ${borderCol} ${editorBg} text-[11px] sm:text-[12px] font-sans text-[#868686] shrink-0`}
             >
-              <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap min-w-0">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setBreadcrumbDropdown((prev) => (prev === 'files' ? null : 'files'))
-                  }
-                  className="hidden sm:inline hover:bg-[#2A2D2E] hover:text-[#CCCCCC] px-1 rounded cursor-pointer shrink-0"
-                >
-                  mustafa-dev-portfolio
-                </button>
+              <div className="flex items-center gap-1 overflow-x-auto overflow-y-hidden no-scrollbar whitespace-nowrap min-w-0">
+                <span className="hidden sm:inline px-1 shrink-0">mustafa-dev-portfolio</span>
                 <Codicon
                   name="chevron-right"
                   className="hidden sm:inline !text-[13px] text-[#868686] shrink-0"
                 />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setBreadcrumbDropdown((prev) => (prev === 'files' ? null : 'files'))
-                  }
-                  className="hover:bg-[#2A2D2E] hover:text-[#CCCCCC] px-1 rounded cursor-pointer shrink-0"
-                >
+                <span className="px-1 shrink-0">
                   {currentFileMeta.folder.replace('/', ' › ')}
-                </button>
+                </span>
                 <Codicon name="chevron-right" className="!text-[13px] text-[#868686] shrink-0" />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setBreadcrumbDropdown((prev) => (prev === 'files' ? null : 'files'))
-                  }
-                  className="inline-flex items-center gap-1.5 text-[#CCCCCC] hover:bg-[#2A2D2E] px-1.5 rounded cursor-pointer shrink-0"
-                >
+                <span className="inline-flex items-center gap-1.5 text-[#CCCCCC] px-1 shrink-0">
                   <SetiFileIcon
                     fileId={currentFileMeta.id}
                     extension={currentFileMeta.extension}
                     className="w-3.5 h-3.5 shrink-0"
                   />
                   <span>{currentFileMeta.name}</span>
-                </button>
-                <Codicon name="chevron-right" className="!text-[13px] text-[#868686] shrink-0" />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setBreadcrumbDropdown((prev) => (prev === 'symbols' ? null : 'symbols'))
-                  }
-                  className="inline-flex items-center gap-1 text-[#CCCCCC] hover:bg-[#2A2D2E] px-1.5 rounded cursor-pointer shrink-0"
-                >
-                  <Codicon name="symbol-method" className="!text-[13px] text-[#B180D7]" />
-                  <span>
-                    {currentFileMeta.symbols?.[0]?.name || `${currentFileMeta.navLabel}Module`}
-                  </span>
-                </button>
+                </span>
               </div>
-
-              {/* Breadcrumb Sibling File Picker Dropdown */}
-              {breadcrumbDropdown === 'files' && (
-                <>
-                  <div
-                    className="fixed inset-0 z-30"
-                    onClick={() => setBreadcrumbDropdown(null)}
-                  />
-                  <div className="absolute left-2 sm:left-24 top-[22px] w-64 max-w-[calc(100vw-3.5rem)] rounded-md border border-[#454545] bg-[#252526] text-[#CCCCCC] shadow-xl py-1 z-40 text-xs">
-                    {WORKSPACE_FILES.map((wf) => (
-                      <button
-                        key={wf.id}
-                        type="button"
-                        onClick={() => handleOpenFile(wf.id)}
-                        className={`w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#04395E] hover:text-white text-left cursor-pointer ${
-                          wf.id === activeFile ? 'bg-[#04395E] text-white' : ''
-                        }`}
-                      >
-                        <span className="flex items-center gap-2 truncate">
-                          <SetiFileIcon
-                            fileId={wf.id}
-                            extension={wf.extension}
-                            className="w-4 h-4 shrink-0"
-                          />
-                          <span className="truncate">{wf.name}</span>
-                        </span>
-                        <span className="font-mono text-[10px] text-[#858585] shrink-0">
-                          {wf.shortcut}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {/* Breadcrumb Symbol Picker Dropdown */}
-              {breadcrumbDropdown === 'symbols' && (
-                <>
-                  <div
-                    className="fixed inset-0 z-30"
-                    onClick={() => setBreadcrumbDropdown(null)}
-                  />
-                  <div className="absolute left-2 sm:left-64 top-[22px] w-64 max-w-[calc(100vw-3.5rem)] rounded-md border border-[#454545] bg-[#252526] text-[#CCCCCC] shadow-xl py-1 z-40 text-xs">
-                    {(
-                      currentFileMeta.symbols || [
-                        { name: 'defaultExport', kind: 'method' as const, line: 1 },
-                      ]
-                    ).map((sym) => (
-                      <button
-                        key={sym.name}
-                        type="button"
-                        onClick={() => {
-                          setCursorPos({ line: sym.line, col: 1 });
-                          setBreadcrumbDropdown(null);
-                        }}
-                        className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#04395E] hover:text-white text-left cursor-pointer"
-                      >
-                        <span className="flex items-center gap-2 truncate">
-                          <Codicon
-                            name={`symbol-${sym.kind}`}
-                            className="!text-[14px] text-[#B180D7]"
-                          />
-                          <span className="truncate">{sym.name}</span>
-                        </span>
-                        <span className="font-mono text-[10px] text-[#858585]">
-                          Ln {sym.line}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
             </div>
           )}
 
@@ -3370,6 +2521,7 @@ export default function App() {
                     cursorStyle={settings.cursorStyle}
                     cursorBlinking={settings.cursorBlinking}
                     onCursorChange={(line, col) => setCursorPos({ line, col })}
+                    isOwner={isOwner}
                   />
                 </div>
               )}
@@ -3380,10 +2532,8 @@ export default function App() {
                     activeFile={activeFile}
                     theme={theme}
                     projects={projects}
-                    guestbook={guestbook}
                     messages={messages}
                     visitorCount={visitorCount}
-                    syncStats={syncStats}
                     settings={settings}
                     onUpdateSettings={handleUpdateSettings}
                     customFiles={customFiles}
@@ -3402,10 +2552,11 @@ export default function App() {
                       setTerminalOpen(true);
                       setActivePanelTab('terminal');
                     }}
-                    onTriggerSync={() => handleTriggerSync(false)}
-                    onGuestbookAdded={(entries) => setGuestbook(entries)}
-                    onMessagesUpdated={(msgs) => setMessages(msgs)}
                     onCursorChange={(line, col) => setCursorPos({ line, col })}
+                    isOwner={isOwner}
+                    currentUserEmail={currentUser?.email || null}
+                    onOwnerSignIn={handleOwnerSignIn}
+                    onOwnerSignOut={handleOwnerSignOut}
                   />
                 </div>
               )}
@@ -3418,10 +2569,8 @@ export default function App() {
                       activeFile={activeFile}
                       theme={theme}
                       projects={projects}
-                      guestbook={guestbook}
                       messages={messages}
                       visitorCount={visitorCount}
-                      syncStats={syncStats}
                       settings={settings}
                       onUpdateSettings={handleUpdateSettings}
                       customFiles={customFiles}
@@ -3440,10 +2589,11 @@ export default function App() {
                         setTerminalOpen(true);
                         setActivePanelTab('terminal');
                       }}
-                      onTriggerSync={() => handleTriggerSync(false)}
-                      onGuestbookAdded={(entries) => setGuestbook(entries)}
-                      onMessagesUpdated={(msgs) => setMessages(msgs)}
                       onCursorChange={(line, col) => setCursorPos({ line, col })}
+                      isOwner={isOwner}
+                      currentUserEmail={currentUser?.email || null}
+                      onOwnerSignIn={handleOwnerSignIn}
+                      onOwnerSignOut={handleOwnerSignOut}
                     />
                   </div>
 
@@ -3483,6 +2633,7 @@ export default function App() {
                         cursorStyle={settings.cursorStyle}
                         cursorBlinking={settings.cursorBlinking}
                         onCursorChange={(line, col) => setCursorPos({ line, col })}
+                        isOwner={isOwner}
                       />
                     </div>
                   </div>
@@ -3490,8 +2641,8 @@ export default function App() {
               )}
             </main>
 
-            {/* Official Right-Hand VS Code Minimap */}
-            {minimapVisible && (
+            {/* Official Right-Hand VS Code Minimap (Only shown in Code or Split view so visual Preview stays uncluttered) */}
+            {minimapVisible && (editorMode === 'code' || editorMode === 'split') && (
               <div
                 aria-hidden="true"
                 className={`hidden md:flex flex-col w-14 border-l ${borderCol} ${editorBg} py-2 px-1.5 select-none shrink-0 relative overflow-hidden`}
@@ -3538,63 +2689,17 @@ export default function App() {
             onOpenFile={handleOpenFile}
             onSelectProject={(proj) => setSelectedProject(proj)}
             onStarProject={handleStarProject}
-            onTriggerSync={handleTriggerSync}
             onToggleTheme={handleToggleTheme}
             theme={theme}
             projects={projects}
+            visitorCount={visitorCount}
             messages={messages}
-            syncStats={syncStats}
-            syncLogs={syncLogs}
+            isOwner={isOwner}
+            onOwnerSignIn={handleOwnerSignIn}
+            os={activeOS}
           />
         </div>
       </div>
-
-      {/* OFFICIAL BOTTOM-RIGHT VS CODE NOTIFICATIONS TOAST CENTER */}
-      {notificationsOpen && (
-        <div className="fixed right-3 bottom-7 z-50 w-80 rounded-md border border-[#454545] bg-[#252526] text-[#CCCCCC] shadow-2xl overflow-hidden text-xs">
-          <div className="flex items-center justify-between px-3 py-1.5 bg-[#181818] border-b border-[#2B2B2B] font-semibold text-[11px] uppercase tracking-wide">
-            <span>
-              {notifications.length > 0
-                ? `NOTIFICATIONS (${notifications.length})`
-                : 'NO NEW NOTIFICATIONS'}
-            </span>
-            <div className="flex items-center gap-1.5">
-              {notifications.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setNotifications([])}
-                  title="Clear All Notifications"
-                  className="p-0.5 rounded hover:bg-[#2A2D2E] text-[#CCCCCC] cursor-pointer"
-                >
-                  <Codicon name="clear-all" className="!text-[13px]" />
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setNotificationsOpen(false)}
-                title="Hide Notifications"
-                className="p-0.5 rounded hover:bg-[#2A2D2E] text-[#CCCCCC] cursor-pointer"
-              >
-                <Codicon name="chevron-down" className="!text-[13px]" />
-              </button>
-            </div>
-          </div>
-          <div className="divide-y divide-[#2B2B2B] max-h-60 overflow-y-auto">
-            {notifications.map((n) => (
-              <div key={n.id} className="p-3 space-y-1">
-                <div className="flex items-start gap-2">
-                  <Codicon name="info" className="!text-[14px] text-[#0078D4] mt-0.5" />
-                  <p className="text-white leading-snug">{n.title}</p>
-                </div>
-                <div className="flex items-center justify-between pl-5 text-[10px] text-[#858585]">
-                  <span>Source: {n.source}</span>
-                  <span>{n.time}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* OFFICIAL HELP > ABOUT VISUAL STUDIO CODE MODAL DIALOG */}
       {aboutModalOpen && (
@@ -3616,11 +2721,9 @@ export default function App() {
               </div>
             </div>
             <div className="space-y-1 font-mono text-[11px] bg-[#181818] p-3 rounded border border-[#2B2B2B]">
-              <div>Version: 1.95.3 (Dark Modern)</div>
               <div>Developer: {DEVELOPER_PROFILE.name}</div>
-              <div>Degree: BCA · Brainware University (9.09 / 10 CGPA)</div>
-              <div>Stack: React 19.0.1 · Tailwind CSS 4.3 · Vite 8.3</div>
-              <div>Cloud Engine: Express + SSE Real-Time Sync</div>
+              <div>Role: {DEVELOPER_PROFILE.title} ({DEVELOPER_PROFILE.roleSubtitle})</div>
+              <div>Stack: React 19 · Tailwind CSS v4 · Firebase Firestore</div>
             </div>
             <div className="flex justify-end gap-2">
               <button
@@ -3647,153 +2750,122 @@ export default function App() {
         </div>
       )}
 
-      {/* 4. OFFICIAL VS CODE 22PX BOTTOM STATUS BAR (TURNS #CC6633 ORANGE WHEN DEBUGGING F5) */}
+      {/* 4. CLEAN, PROFESSIONAL VS CODE 22PX BOTTOM STATUS BAR */}
       <footer
         aria-label="VS Code Status Bar"
-        className={`h-[22px] flex items-center justify-between pr-2.5 border-t ${borderCol} ${
-          isDebugging ? 'bg-[#CC6633] text-white' : chromeBg
-        } text-[11px] font-sans shrink-0`}
+        className={`h-[22px] flex items-center justify-between pr-2.5 border-t ${borderCol} ${chromeBg} text-[11px] font-sans shrink-0`}
       >
         {/* Left Status Bar Items */}
         <div className="flex items-center gap-2 h-full min-w-0">
-          {/* Official Remote Indicator Button */}
+          {/* Official Brand Indicator Button */}
           <button
             type="button"
-            onClick={() => openQuickPick('> ')}
-            title="Connected to Remote Portfolio Workspace"
+            onClick={() => handleOpenFile('overview.tsx')}
+            title="MUSTAFA.dev — MD Mustafa Hossain Portfolio"
             className="h-full px-2.5 bg-[#0078D4] hover:bg-[#1084DF] text-white flex items-center gap-1.5 cursor-pointer shrink-0"
           >
-            <Codicon name="remote" className="!text-[13px]" />
-            <span className="hidden sm:inline font-medium">MUSTAFA.dev</span>
+            <Codicon name="code" className="!text-[13px]" />
+            <span className="font-medium">MUSTAFA.dev</span>
           </button>
 
-          {/* Git Branch Selector */}
-          <button
-            type="button"
-            onClick={() => {
-              const branches: Array<typeof gitBranch> = [
-                'main',
-                'feat/vscode-ui',
-                'release/v2.4.0',
-              ];
-              const next = branches[(branches.indexOf(gitBranch) + 1) % branches.length];
-              setGitBranch(next);
-            }}
-            title="Checkout Git Branch (Click to switch branch)"
-            className="h-full flex items-center gap-1 hover:bg-[#2A2D2E] px-1.5 cursor-pointer shrink-0"
-          >
-            <Codicon name="source-control" className="!text-[12px]" />
-            <span>{gitBranch}*</span>
-          </button>
-
-          {/* Cloud Sync with Official Spinning Codicon */}
-          <button
-            type="button"
-            onClick={() => handleTriggerSync(false)}
-            title="Synchronize Changes"
-            className="h-full flex items-center gap-1 hover:bg-[#2A2D2E] px-1.5 cursor-pointer tabular-nums shrink-0"
-          >
-            <Codicon name="sync" spin={isSyncingNow} className="!text-[12px]" />
-            <span>{syncStats.syncCount}</span>
-          </button>
-
-          {/* Errors & Warnings */}
-          <button
-            type="button"
-            onClick={() => {
-              setTerminalOpen(true);
-              setActivePanelTab('problems');
-            }}
-            title="No Problems Detected — Click to open Problems view"
-            className="hidden sm:flex items-center gap-2 h-full hover:bg-[#2A2D2E] px-1.5 cursor-pointer tabular-nums shrink-0"
-          >
-            <span className="flex items-center gap-1">
-              <Codicon name="error" className="!text-[12px]" />0
-            </span>
-            <span className="flex items-center gap-1">
-              <Codicon name="warning" className="!text-[12px]" />0
-            </span>
-          </button>
-          {/* Inbox Status Bar Shortcut */}
+          {/* Inbox Status Bar Shortcut (Strictly Owner-Only) */}
           <button
             type="button"
             onClick={() => handleOpenFile('messages-inbox.json')}
-            title="Open Contact Messages Inbox (config/messages-inbox.json)"
-            className="h-full flex items-center gap-1 hover:bg-[#2A2D2E] px-1.5 cursor-pointer tabular-nums shrink-0"
+            title={
+              isOwner
+                ? 'Open Verified Owner Inbox (config/messages-inbox.json)'
+                : 'Owner Inbox (Restricted — Sign in as Owner to view)'
+            }
+            className="h-full flex items-center gap-1 hover:bg-[#2A2D2E] px-2 cursor-pointer tabular-nums shrink-0"
           >
-            <Codicon name="mail" className="!text-[12px] text-[#4EC9B0]" />
-            <span className="hidden xs:inline">Inbox</span>
-            <span>({messages.length})</span>
+            <Codicon
+              name={isOwner ? 'mail' : 'lock'}
+              className={`!text-[12px] ${isOwner ? 'text-[#4EC9B0]' : 'text-[#858585]'}`}
+            />
+            <span>{isOwner ? `Owner Inbox (${messages.length})` : 'Owner Inbox'}</span>
           </button>
         </div>
 
-        {/* Right Status Bar Items (All Interactive like Official VS Code) */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5 h-full shrink-0 text-[11px] tabular-nums">
-          <button
-            type="button"
-            onClick={() => openQuickPick(':')}
-            title="Go to Line/Column (Ctrl+G)"
-            className="hover:bg-[#2A2D2E] px-1 sm:px-1.5 py-0.5 cursor-pointer"
-          >
-            Ln {cursorPos.line}, Col {cursorPos.col}
-          </button>
-          <button
-            type="button"
-            onClick={() => setIndentSpaces((prev) => (prev === 2 ? 4 : 2))}
-            title="Select Indentation"
-            className="hidden lg:inline hover:bg-[#2A2D2E] px-1.5 py-0.5 cursor-pointer"
-          >
-            Spaces: {indentSpaces}
-          </button>
-          <button
-            type="button"
-            onClick={() => handleOpenFile('settings')}
-            title="Select Encoding"
-            className="hidden md:inline hover:bg-[#2A2D2E] px-1.5 py-0.5 cursor-pointer"
-          >
+        {/* Right Status Bar Items */}
+        <div className="flex items-center gap-2 h-full shrink-0 text-[11px] tabular-nums">
+          <span className="hidden md:flex items-center h-full px-2 text-[#858585]">
             UTF-8
-          </button>
-          <button
-            type="button"
-            onClick={() => setEolMode((prev) => (prev === 'LF' ? 'CRLF' : 'LF'))}
-            title="Select End of Line Sequence"
-            className="hidden lg:inline hover:bg-[#2A2D2E] px-1.5 py-0.5 cursor-pointer"
-          >
-            {eolMode}
-          </button>
-          <button
-            type="button"
-            onClick={() => openQuickPick('')}
-            title="Select Language Mode"
-            className="hidden sm:inline hover:bg-[#2A2D2E] px-1.5 py-0.5 cursor-pointer"
-          >
+          </span>
+
+          <span className="hidden sm:flex items-center h-full px-2 text-[#CCCCCC]">
             {currentFileMeta.language}
-          </button>
+          </span>
+
           <button
             type="button"
-            onClick={() => {
-              setTerminalOpen(true);
-              setActivePanelTab('output');
-            }}
-            title="Prettier Code Formatter"
-            className="hidden md:flex items-center gap-1 hover:bg-[#2A2D2E] px-1.5 py-0.5 cursor-pointer"
+            onClick={() => setTerminalOpen((prev) => !prev)}
+            title="Toggle Interactive Terminal (Ctrl+`)"
+            className="h-full flex items-center gap-1 hover:bg-[#2A2D2E] px-2 cursor-pointer"
           >
-            <Codicon name="check-all" className="!text-[13px]" />
-            <span>Prettier</span>
+            <Codicon name="terminal" className="!text-[12px]" />
+            <span>Terminal</span>
           </button>
+
           <button
             type="button"
-            onClick={() => setNotificationsOpen((prev) => !prev)}
-            title="Notifications"
-            className="hover:bg-[#2A2D2E] px-1 py-0.5 flex items-center cursor-pointer"
+            onClick={() => handleToggleTheme()}
+            title="Switch Dark / Light Theme (Alt+T)"
+            className="h-full flex items-center gap-1 hover:bg-[#2A2D2E] px-2 cursor-pointer"
           >
-            <Codicon
-              name={notifications.length > 0 ? 'bell-dot' : 'bell'}
-              className="!text-[12px]"
-            />
+            <Codicon name="color-mode" className="!text-[12px]" />
+            <span className="hidden xs:inline">{isDark ? 'Dark Modern' : 'Light Modern'}</span>
+          </button>
+
+          {/* OS Platform Switcher in Status Bar */}
+          <button
+            type="button"
+            onClick={() => setOSModalOpen(true)}
+            title={`Active OS: ${OS_META[activeOS].name} (${isAutoOS ? 'Auto' : 'Manual'}). Click to change`}
+            className="h-full flex items-center gap-1 hover:bg-[#2A2D2E] px-2 cursor-pointer font-mono text-[10px] text-[#4FC1FF]"
+          >
+            <span>
+              {activeOS === 'macos' && '🍎 Mac'}
+              {activeOS === 'windows' && '🪟 Win'}
+              {activeOS === 'linux' && '🐧 Linux'}
+              {activeOS === 'android' && '🤖 Android'}
+              {activeOS === 'ios' && '📱 iOS'}
+            </span>
           </button>
         </div>
       </footer>
+
+      {/* 5. DEDICATED MOBILE TOUCH BOTTOM BAR (One-thumb navigation for smartphones & tablets) */}
+      <MobileTouchBar
+        activityView={activityView}
+        sidebarOpen={sidebarOpen}
+        terminalOpen={terminalOpen}
+        onSelectActivity={(view) => handleActivityClick(view)}
+        onToggleTerminal={() => setTerminalOpen((prev) => !prev)}
+        onOpenResume={() => window.open(DEVELOPER_PROFILE.resumeUrl, '_blank')}
+        currentOS={activeOS}
+        onOpenOSSwitcher={() => setOSModalOpen(true)}
+        theme={theme}
+        unreadCount={isOwner ? messages.filter((m) => !m.read).length : 0}
+      />
+
+      {/* Cross-Platform OS Switcher Modal (macOS, Windows 11, Linux Ubuntu, Android, iOS) */}
+      <OSSwitcherModal
+        isOpen={osModalOpen}
+        onClose={() => setOSModalOpen(false)}
+        currentOS={activeOS}
+        onSelectOS={handleSelectOS}
+        isAutoDetect={isAutoOS}
+        theme={theme}
+      />
+
+      {/* Non-intrusive Offline Connectivity Indicator */}
+      {!isOnline && (
+        <div className="fixed bottom-14 left-4 z-50 flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white shadow-xl">
+          <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+          <span>Offline Mode — Cached data is being used.</span>
+        </div>
+      )}
 
       {/* Command Palette / Quick Open Modal */}
       <CommandPaletteModal
@@ -3805,7 +2877,6 @@ export default function App() {
         onSelectProject={(proj) => setSelectedProject(proj)}
         onToggleTerminal={() => setTerminalOpen((prev) => !prev)}
         onToggleTheme={() => handleToggleTheme()}
-        onTriggerSync={() => handleTriggerSync(false)}
         onToggleSplitEditor={() =>
           setEditorMode((prev) => (prev === 'split' ? 'hybrid' : 'split'))
         }

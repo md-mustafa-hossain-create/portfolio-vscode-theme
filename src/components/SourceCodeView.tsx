@@ -26,6 +26,7 @@ interface SourceCodeViewProps {
   cursorStyle?: 'block' | 'line' | 'underline';
   cursorBlinking?: 'smooth' | 'blink' | 'solid';
   onCursorChange?: (line: number, col: number) => void;
+  isOwner?: boolean;
 }
 
 export const SourceCodeView: React.FC<SourceCodeViewProps> = ({
@@ -38,6 +39,7 @@ export const SourceCodeView: React.FC<SourceCodeViewProps> = ({
   cursorStyle = 'block',
   cursorBlinking = 'smooth',
   onCursorChange,
+  isOwner = false,
 }) => {
   const [copied, setCopied] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -57,10 +59,9 @@ export const SourceCodeView: React.FC<SourceCodeViewProps> = ({
           displayName: skill.name,
           version: skill.version,
           publisher: skill.publisher,
+          experience: skill.experience,
           description: skill.desc,
           category: skill.category,
-          downloads: skill.downloads,
-          rating: skill.rating,
           projectsUsed: skill.projectsUsed,
           codeExample: skill.codeExample,
         },
@@ -72,12 +73,11 @@ export const SourceCodeView: React.FC<SourceCodeViewProps> = ({
     switch (activeFile) {
       case 'overview.tsx':
         return `import React from 'react';
-import { DeveloperProfile, AcademicRecord } from '@mustafa/types';
+import { DeveloperProfile } from '@mustafa/types';
 
 /**
  * ${DEVELOPER_PROFILE.name} — ${DEVELOPER_PROFILE.title} (${DEVELOPER_PROFILE.roleSubtitle})
  * Location: ${DEVELOPER_PROFILE.location}
- * Education: ${DEVELOPER_PROFILE.educationShort}
  */
 export const MUSTAFA_PROFILE: DeveloperProfile = {
   name: "${DEVELOPER_PROFILE.name}",
@@ -85,13 +85,6 @@ export const MUSTAFA_PROFILE: DeveloperProfile = {
   role: "${DEVELOPER_PROFILE.title} / ${DEVELOPER_PROFILE.roleSubtitle}",
   email: "${DEVELOPER_PROFILE.email}",
   location: "${DEVELOPER_PROFILE.location}",
-  education: {
-    degree: "Bachelor of Computer Applications (BCA)",
-    university: "Brainware University, West Bengal, India",
-    cgpa: 9.09,
-    scale: 10.0,
-    graduated: 2024,
-  },
   availability: "${DEVELOPER_PROFILE.availability}",
   philosophy: "${DEVELOPER_PROFILE.quote}",
   socials: {
@@ -190,11 +183,25 @@ export const CONTACT_CONFIG = {
 };`;
 
       case 'messages-inbox.json':
+        if (!isOwner) {
+          return JSON.stringify(
+            {
+              status: '403_RESTRICTED_OWNER_RESOURCE',
+              owner: DEVELOPER_PROFILE.name,
+              ownerEmail: DEVELOPER_PROFILE.email,
+              securityPolicy:
+                'Zero-Trust Firestore Security Rules: Contact messages are strictly accessible only to the verified website owner (hussainmustafa2001@gmail.com).',
+              incomingMessages: '[REDACTED — Sign in as Owner in Preview Mode to view]',
+            },
+            null,
+            2
+          );
+        }
         return JSON.stringify(
           {
-            $schema: 'https://mustafa-dev-portfolio.web.app/schemas/messages-inbox.json',
             owner: DEVELOPER_PROFILE.name,
-            endpoint: '/api/messages',
+            ownerEmail: DEVELOPER_PROFILE.email,
+            storage: 'Firebase Firestore (/messages)',
             unreadCount: messages.filter((m) => !m.read).length,
             incomingMessages: messages,
           },

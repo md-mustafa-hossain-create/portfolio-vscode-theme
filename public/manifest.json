@@ -1,0 +1,39 @@
+{
+  "id": "/",
+  "name": "MD Mustafa Hossain — VS Code Developer Portfolio",
+  "short_name": "MUSTAFA.dev",
+  "description": "Interactive VS Code-inspired developer portfolio for MD Mustafa Hossain, Frontend React Developer. Features real-time state, terminal shell, and official Gemini AI assistant.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#181818",
+  "theme_color": "#0078D4",
+  "categories": ["developer", "productivity", "portfolio"],
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

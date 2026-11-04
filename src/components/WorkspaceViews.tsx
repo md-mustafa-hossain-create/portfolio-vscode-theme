@@ -7,6 +7,12 @@ import {
   EDUCATION_TIMELINE,
   BLOG_POSTS,
 } from '../data/portfolioData';
+import {
+  submitContactMessageToFirestore,
+  toggleContactMessageReadInFirestore,
+  deleteContactMessageFromFirestore,
+  PORTFOLIO_OWNER_EMAIL,
+} from '../firebase';
 
 export interface ContactMessage {
   id: string;
@@ -17,14 +23,6 @@ export interface ContactMessage {
   createdAt: string;
   source: 'form' | 'terminal';
   read: boolean;
-}
-
-export interface GuestbookEntry {
-  id: string;
-  author: string;
-  role: string;
-  comment: string;
-  createdAt: string;
 }
 
 export interface WorkbenchSettings {
@@ -43,14 +41,8 @@ interface WorkspaceViewsProps {
   activeFile: string;
   theme: 'dark' | 'light';
   projects: PortfolioProject[];
-  guestbook: GuestbookEntry[];
   messages?: ContactMessage[];
   visitorCount?: number;
-  syncStats: {
-    syncCount: number;
-    lastSyncedAt: string;
-    totalCommandsExecuted: number;
-  };
   settings: WorkbenchSettings;
   onUpdateSettings: (partial: Partial<WorkbenchSettings>) => void;
   cursorPos?: { line: number; col: number };
@@ -60,20 +52,19 @@ interface WorkspaceViewsProps {
   onSelectProject: (project: PortfolioProject) => void;
   onStarProject: (projectId: string) => Promise<void>;
   onOpenTerminal: () => void;
-  onTriggerSync: () => Promise<void>;
-  onGuestbookAdded: (entries: GuestbookEntry[]) => void;
-  onMessagesUpdated?: (messages: ContactMessage[]) => void;
   onCursorChange?: (line: number, col: number) => void;
+  isOwner?: boolean;
+  currentUserEmail?: string | null;
+  onOwnerSignIn?: () => Promise<void>;
+  onOwnerSignOut?: () => Promise<void>;
 }
 
 export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
   activeFile,
   theme,
   projects,
-  guestbook,
   messages = [],
-  visitorCount = 284,
-  syncStats,
+  visitorCount = 0,
   settings,
   onUpdateSettings,
   cursorPos = { line: 5, col: 14 },
@@ -83,15 +74,13 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
   onSelectProject,
   onStarProject,
   onOpenTerminal,
-  onTriggerSync,
-  onGuestbookAdded,
-  onMessagesUpdated,
   onCursorChange,
+  isOwner = false,
+  currentUserEmail = null,
+  onOwnerSignIn,
+  onOwnerSignOut,
 }) => {
   const isDark = theme === 'dark';
-
-  // Collapsible JSDoc header fold state
-  const [headerFolded, setHeaderFolded] = useState(false);
 
   // Portrait image fallback state
   const [avatarSrc, setAvatarSrc] = useState(DEVELOPER_PROFILE.avatarUrl);
@@ -115,8 +104,7 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
   const [settingsSection, setSettingsSection] = useState<string>('Commonly Used');
 
   // Extension detail sub-tab state
-  const [extSubTab, setExtSubTab] = useState<'details' | 'features' | 'changelog'>('details');
-  const [disabledExtensions, setDisabledExtensions] = useState<Record<string, boolean>>({});
+  const [extSubTab, setExtSubTab] = useState<'details' | 'features'>('details');
 
   // Contact form state
   const [contactName, setContactName] = useState('');
@@ -126,12 +114,7 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
     'idle'
   );
   const [contactErrorText, setContactErrorText] = useState('');
-
-  // Guestbook form state
-  const [gbAuthor, setGbAuthor] = useState('');
-  const [gbRole, setGbRole] = useState('');
-  const [gbComment, setGbComment] = useState('');
-  const [gbSubmitting, setGbSubmitting] = useState(false);
+  const [emailCopied, setEmailCopied] = useState(false);
 
   const handleAvatarError = () => {
     if (avatarSrc !== DEVELOPER_PROFILE.fallbackAvatarUrl) {
@@ -149,88 +132,37 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
     setContactErrorText('');
 
     try {
-      const res = await fetch('/api/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: contactName.trim(),
-          email: contactEmail.trim(),
-          message: contactMessage.trim(),
-          source: 'form',
-        }),
+      await submitContactMessageToFirestore({
+        name: contactName.trim(),
+        email: contactEmail.trim(),
+        message: contactMessage.trim(),
+        source: 'form',
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setContactStatus('error');
-        setContactErrorText(data.error || 'Please check all fields and try again.');
-        return;
-      }
       setContactStatus('success');
       setContactName('');
       setContactEmail('');
       setContactMessage('');
-      if (Array.isArray(data.messages)) {
-        onMessagesUpdated?.(data.messages);
-      }
     } catch {
       setContactStatus('error');
-      setContactErrorText('Unable to reach cloud synchronization service. Please try again.');
+      setContactErrorText('Please provide a valid name, email address, and message.');
     }
   };
 
   const handleToggleMessageRead = async (msgId: string, currentRead: boolean) => {
+    if (!isOwner) return;
     try {
-      const res = await fetch(`/api/messages/${msgId}/read`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ read: !currentRead }),
-      });
-      const data = await res.json();
-      if (res.ok && Array.isArray(data.messages)) {
-        onMessagesUpdated?.(data.messages);
-      }
+      await toggleContactMessageReadInFirestore(msgId, !currentRead);
     } catch {
-      // Ignore network error
+      // Handled by Firestore error logger
     }
   };
 
   const handleDeleteMessage = async (msgId: string) => {
+    if (!isOwner) return;
     try {
-      const res = await fetch(`/api/messages/${msgId}`, {
-        method: 'DELETE',
-      });
-      const data = await res.json();
-      if (res.ok && Array.isArray(data.messages)) {
-        onMessagesUpdated?.(data.messages);
-      }
+      await deleteContactMessageFromFirestore(msgId);
     } catch {
-      // Ignore network error
-    }
-  };
-
-  const handleGuestbookSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (gbSubmitting || !gbAuthor.trim() || !gbComment.trim()) return;
-    setGbSubmitting(true);
-    try {
-      const res = await fetch('/api/guestbook', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          author: gbAuthor.trim(),
-          role: gbRole.trim() || 'Developer Peer',
-          comment: gbComment.trim(),
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && Array.isArray(data.guestbook)) {
-        onGuestbookAdded(data.guestbook);
-        setGbAuthor('');
-        setGbRole('');
-        setGbComment('');
-      }
-    } finally {
-      setGbSubmitting(false);
+      // Handled by Firestore error logger
     }
   };
 
@@ -241,308 +173,21 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
   const headingText = isDark ? 'text-white' : 'text-[#1F1F1F]';
   const borderClass = isDark ? 'border-[#2B2B2B]' : 'border-[#E5E5E5]';
 
-  const caretBlinkClass =
-    settings.cursorBlinking === 'blink'
-      ? 'vscode-caret-stick-blink'
-      : settings.cursorBlinking === 'solid'
-      ? 'vscode-caret-stick-solid'
-      : '';
-
-  // Helper wrapper that renders unified horizontal rows of (Gutter Line Number + Code Line) so Line N's gutter number is ALWAYS 100% aligned with Code Line N, plus explicit blinking white stick caret
+  // Clean, uncluttered visual page container for Preview mode (raw code & line numbers live in the dedicated Code / Split view)
   const renderHybridEditorCanvas = (
-    moduleComment: string,
-    exportSignature: React.ReactNode,
-    codeLensActions: Array<{ label: string; onClick: () => void }>,
+    _moduleComment: string,
+    _exportSignature: React.ReactNode,
+    _codeLensActions: Array<{ label: string; onClick: () => void }>,
     interactiveContent: React.ReactNode
   ) => {
-    const activeLine = Math.max(1, Math.min(8, cursorPos.line));
-    const activeCol = Math.max(1, cursorPos.col);
-    const activeLineHighlighterClass = isDark
-      ? 'vscode-active-line-dark'
-      : 'vscode-active-line-light';
-
-    const jsdocLines = [
-      { lineNum: 1, text: '/**' },
-      { lineNum: 2, text: ` * ${moduleComment}` },
-      { lineNum: 3, text: ` * @author ${DEVELOPER_PROFILE.name} <${DEVELOPER_PROFILE.email}>` },
-      { lineNum: 4, text: ' */' },
-    ];
-
-    const renderGutterCell = (lineNum: number, showFoldToggle = false) => {
-      if (settings.lineNumbers !== 'on') return null;
-      const isCurrentLine = activeLine === lineNum;
-      return (
-        <div
-          onMouseDown={(e) => {
-            e.stopPropagation();
-            onCursorChange?.(lineNum, 1);
-          }}
-          title={`Line ${lineNum}`}
-          className={`w-8 sm:w-12 md:w-14 shrink-0 flex items-center justify-end gap-1 sm:gap-1.5 pr-1 sm:pr-2 pl-1 sm:pl-2 select-none font-mono text-[11px] sm:text-xs tabular-nums cursor-pointer border-r ${
-            isDark
-              ? 'border-[#2B2B2B]/60'
-              : 'border-[#E5E5E5]'
-          } ${
-            isCurrentLine
-              ? isDark
-                ? 'text-white font-semibold'
-                : 'text-[#1F1F1F] font-semibold'
-              : 'text-[#6E7681] hover:text-[#CCCCCC]'
-          }`}
-        >
-          <span className="w-4 sm:w-5 text-right">{lineNum}</span>
-          <span className="w-2.5 sm:w-3 flex items-center justify-center">
-            {showFoldToggle && (
-              <button
-                type="button"
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  setHeaderFolded((prev) => !prev);
-                }}
-                className="text-[#858585] hover:text-white flex items-center"
-              >
-                <Codicon
-                  name={headerFolded ? 'chevron-right' : 'chevron-down'}
-                  className="!text-[11px] sm:!text-[12px]"
-                />
-              </button>
-            )}
-          </span>
-        </div>
-      );
-    };
-
-    const renderUnifiedTextRow = (
-      lineNum: number,
-      text: string,
-      colorClass: string,
-      showFoldToggle = false
-    ) => {
-      const isCurrentLine = activeLine === lineNum;
-      const chars = text.split('');
-      const clampedCol = isCurrentLine ? Math.max(1, Math.min(chars.length + 1, activeCol)) : -1;
-
-      return (
-        <div
-          key={lineNum}
-          onMouseDown={() => onCursorChange?.(lineNum, chars.length + 1)}
-          className={`flex items-stretch min-h-[26px] leading-[26px] font-mono text-xs sm:text-[13px] ${
-            isCurrentLine ? activeLineHighlighterClass : 'hover:bg-white/[0.03]'
-          }`}
-        >
-          {renderGutterCell(lineNum, showFoldToggle)}
-          <div
-            className={`flex-1 pl-2.5 sm:pl-4 pr-2.5 sm:pr-4 cursor-text whitespace-pre-wrap break-words ${colorClass}`}
-          >
-            {chars.map((ch, idx) => {
-              const colNum = idx + 1;
-              const isCursorBefore = isCurrentLine && clampedCol === colNum;
-              return (
-                <React.Fragment key={idx}>
-                  {isCursorBefore && (
-                    <span
-                      key={`caret-${lineNum}-${clampedCol}`}
-                      className={`vscode-caret-stick ${caretBlinkClass}`}
-                      aria-hidden="true"
-                    />
-                  )}
-                  <span
-                    onMouseDown={(e) => {
-                      e.stopPropagation();
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      const clickedRightHalf = e.clientX - rect.left > rect.width / 2;
-                      const targetCol = clickedRightHalf ? colNum + 1 : colNum;
-                      onCursorChange?.(lineNum, targetCol);
-                    }}
-                  >
-                    {ch}
-                  </span>
-                </React.Fragment>
-              );
-            })}
-            {isCurrentLine && clampedCol > chars.length && (
-              <span
-                key={`caret-eol-${lineNum}-${clampedCol}`}
-                className={`vscode-caret-stick ${caretBlinkClass}`}
-                aria-hidden="true"
-              />
-            )}
-          </div>
-        </div>
-      );
-    };
-
-    // Recursively wrap syntax-highlighted React nodes into character-clickable spans with exact left/right half detection
-    const renderUnifiedSignatureRow = (node: React.ReactNode, lineNum: number) => {
-      const isCurrentLine = activeLine === lineNum;
-      let colTracker = 0;
-
-      const transformNode = (child: React.ReactNode): React.ReactNode => {
-        if (typeof child === 'string' || typeof child === 'number') {
-          const str = String(child);
-          return str.split('').map((ch, i) => {
-            colTracker += 1;
-            const thisCol = colTracker;
-            const isCursorBefore = isCurrentLine && activeCol === thisCol;
-            return (
-              <React.Fragment key={`${thisCol}-${i}`}>
-                {isCursorBefore && (
-                  <span
-                    key={`caret-${lineNum}-${activeCol}`}
-                    className={`vscode-caret-stick ${caretBlinkClass}`}
-                    aria-hidden="true"
-                  />
-                )}
-                <span
-                  onMouseDown={(e) => {
-                    e.stopPropagation();
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const clickedRightHalf = e.clientX - rect.left > rect.width / 2;
-                    const targetCol = clickedRightHalf ? thisCol + 1 : thisCol;
-                    onCursorChange?.(lineNum, targetCol);
-                  }}
-                >
-                  {ch}
-                </span>
-              </React.Fragment>
-            );
-          });
-        }
-        if (Array.isArray(child)) {
-          return child.map((c, idx) => <React.Fragment key={idx}>{transformNode(c)}</React.Fragment>);
-        }
-        if (React.isValidElement(child)) {
-          const elementProps = child.props as { children?: React.ReactNode };
-          return React.cloneElement(child, undefined, transformNode(elementProps.children));
-        }
-        return child;
-      };
-
-      const transformedChildren = transformNode(node);
-      const endCol = colTracker + 1;
-      const isCursorAtEnd = isCurrentLine && (activeCol >= endCol || activeCol < 1);
-
-      return (
-        <div
-          onMouseDown={() => onCursorChange?.(lineNum, endCol)}
-          className={`flex items-stretch min-h-[28px] leading-[28px] font-mono text-xs sm:text-[13px] ${
-            isCurrentLine ? activeLineHighlighterClass : 'hover:bg-white/[0.03]'
-          }`}
-        >
-          {renderGutterCell(lineNum)}
-          <div className="flex-1 pl-2.5 sm:pl-4 pr-2.5 sm:pr-4 cursor-text whitespace-pre-wrap break-words">
-            <span>{transformedChildren}</span>
-            {isCursorAtEnd && (
-              <span
-                key={`caret-eol-${lineNum}-${activeCol}`}
-                className={`vscode-caret-stick ${caretBlinkClass}`}
-                aria-hidden="true"
-              />
-            )}
-          </div>
-        </div>
-      );
-    };
-
-    const handleHybridKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement ||
-        e.target instanceof HTMLSelectElement
-      ) {
-        return;
-      }
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        onCursorChange?.(Math.min(8, activeLine + 1), activeCol);
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        onCursorChange?.(Math.max(1, activeLine - 1), activeCol);
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        onCursorChange?.(activeLine, activeCol + 1);
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        onCursorChange?.(activeLine, Math.max(1, activeCol - 1));
-      } else if (e.key === 'Home') {
-        e.preventDefault();
-        onCursorChange?.(activeLine, 1);
-      }
-    };
-
     return (
       <div
-        tabIndex={0}
-        onKeyDown={handleHybridKeyDown}
-        className={`flex flex-col min-h-full font-sans focus:outline-none py-3 ${
+        className={`min-h-full font-sans px-4 sm:px-6 lg:px-10 py-6 sm:py-8 max-w-6xl mx-auto space-y-6 sm:space-y-8 ${
           settings.wordWrap === 'off' ? 'overflow-x-auto' : ''
         }`}
         style={{ fontSize: `${settings.fontSize}px` }}
       >
-        {/* Unnumbered CodeLens Bar Row (keeps gutter column aligned without shifting line numbers) */}
-        <div className="flex items-stretch font-mono text-[10px] sm:text-[11px] text-[#858585]">
-          {settings.lineNumbers === 'on' && (
-            <div
-              className={`w-8 sm:w-12 md:w-14 shrink-0 border-r select-none ${
-                isDark ? 'border-[#2B2B2B]/60' : 'border-[#E5E5E5]'
-              }`}
-            />
-          )}
-          <div className="flex-1 pl-2.5 sm:pl-4 pr-3 sm:pr-6 py-1 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-            {codeLensActions.map((act, idx) => (
-              <React.Fragment key={act.label}>
-                {idx > 0 && <span>|</span>}
-                <button
-                  type="button"
-                  onClick={act.onClick}
-                  className="hover:text-[#0078D4] hover:underline inline-flex items-center gap-1 cursor-pointer"
-                >
-                  {idx === 0 && <Codicon name="play" className="!text-[11px] text-[#4EC9B0]" />}
-                  <span>{act.label}</span>
-                </button>
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
-
-        {/* Unified Code Lines 1-4 (JSDoc Comment) — Each line's gutter number is in the exact same row */}
-        {!headerFolded ? (
-          jsdocLines.map((l, idx) =>
-            renderUnifiedTextRow(l.lineNum, l.text, 'text-[#6A9955]', idx === 0)
-          )
-        ) : (
-          renderUnifiedTextRow(1, '/** ... */', 'text-[#6A9955]', true)
-        )}
-
-        {/* Unified Code Line 5 (Export Signature) */}
-        {renderUnifiedSignatureRow(exportSignature, 5)}
-
-        {/* Unified Code Line 6 (Inline Preview Comment) */}
-        {renderUnifiedTextRow(
-          6,
-          '  // Interactive Visual Component Canvas Mounted Below',
-          'text-[#6A9955]'
-        )}
-
-        {/* Interactive Component Canvas Region with Continuous Gutter Border */}
-        <div className="flex items-stretch">
-          {settings.lineNumbers === 'on' && (
-            <div
-              className={`w-8 sm:w-12 md:w-14 shrink-0 border-r select-none ${
-                isDark ? 'border-[#2B2B2B]/60' : 'border-[#E5E5E5]'
-              }`}
-            />
-          )}
-          <div className="flex-1 min-w-0 px-2.5 sm:px-5 lg:px-8 py-4 sm:py-5 space-y-6 sm:space-y-10">
-            {interactiveContent}
-          </div>
-        </div>
-
-        {/* Unified Code Line 7 (Closing Brace) */}
-        {renderUnifiedTextRow(7, '};', 'text-[#DCDCAA]')}
-
-        {/* Unified Code Line 8 (Default Export) */}
-        {renderUnifiedTextRow(8, 'export default MUSTAFA_PORTFOLIO_MODULE;', 'text-[#C586C0]')}
+        {interactiveContent}
       </div>
     );
   };
@@ -853,19 +498,18 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
     );
   }
 
-  // SPECIAL OFFICIAL VS CODE VIEW B: EXTENSION MARKETPLACE DETAILS TAB (extension:<id>)
+  // SPECIAL OFFICIAL VS CODE VIEW B: TECHNOLOGY STACK EXTENSION DETAILS TAB (extension:<id>)
   if (activeFile.startsWith('extension:')) {
     const skillId = activeFile.replace('extension:', '');
     const skill =
       PORTFOLIO_SKILLS.find((s) => s.id === skillId) || PORTFOLIO_SKILLS[0];
-    const isDisabled = Boolean(disabledExtensions[skill.id]);
 
     return (
       <div className="p-6 sm:p-8 max-w-5xl mx-auto space-y-6 font-sans">
-        {/* Top Official VS Code Extension Header */}
+        {/* Top Official VS Code Technology Header */}
         <div className={`flex flex-col sm:flex-row items-start gap-6 pb-6 border-b ${borderClass}`}>
           <div className="w-24 h-24 rounded-md bg-[#252526] border border-[#3C3C3C] p-4 flex items-center justify-center shrink-0">
-            <OfficialSkillIcon skillId={skill.id} className="w-16 h-16" />
+            <OfficialSkillIcon skillId={skill.id} className="w-16 h-16" theme={theme} />
           </div>
 
           <div className="space-y-2.5 flex-1 min-w-0">
@@ -874,11 +518,9 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
               <span className="px-2 py-0.5 rounded bg-[#2B2B2B] text-xs font-mono text-[#CCCCCC]">
                 {skill.version}
               </span>
-              {isDisabled && (
-                <span className="px-2 py-0.5 rounded bg-[#3A1E1E] text-[#F48771] text-xs font-mono">
-                  Disabled
-                </span>
-              )}
+              <span className="px-2 py-0.5 rounded bg-[#0078D4]/20 border border-[#0078D4]/40 text-xs font-mono text-[#4FC1FF]">
+                {skill.experience}
+              </span>
             </div>
 
             <div className="flex flex-wrap items-center gap-3 text-xs text-[#CCCCCC]">
@@ -887,57 +529,37 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
                 <span>{skill.publisher}</span>
               </span>
               <span>|</span>
-              <span className="inline-flex items-center gap-1 tabular-nums">
-                <Codicon name="cloud-download" className="!text-[13px]" />
-                <span>{skill.downloads} installs</span>
-              </span>
-              <span>|</span>
-              <span className="inline-flex items-center gap-1 text-[#DCDCAA] tabular-nums">
-                <span>★★★★★ ({skill.rating})</span>
-              </span>
+              <span className="font-mono text-[#4EC9B0]">{skill.category}</span>
             </div>
 
             <p className={`text-xs sm:text-sm ${mutedText}`}>{skill.desc}</p>
 
-            {/* Official VS Code Disable / Uninstall / Inspect Buttons */}
+            {/* Navigation Actions */}
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <button
                 type="button"
-                onClick={() =>
-                  setDisabledExtensions((prev) => ({
-                    ...prev,
-                    [skill.id]: !prev[skill.id],
-                  }))
-                }
-                className="px-3 py-1 rounded-xs bg-[#0078D4] hover:bg-[#1084DF] text-white text-xs font-medium cursor-pointer"
-              >
-                {isDisabled ? 'Enable' : 'Disable'}
-              </button>
-              <button
-                type="button"
                 onClick={() => onOpenFile('skills.json')}
-                className="px-3 py-1 rounded-xs bg-[#313131] hover:bg-[#3C3C3C] border border-[#3C3C3C] text-white text-xs font-medium cursor-pointer"
+                className="px-3 py-1.5 rounded-xs bg-[#0078D4] hover:bg-[#1084DF] text-white text-xs font-medium cursor-pointer"
               >
-                View in skills.json
+                Back to Tech Stack (skills.json)
               </button>
               <button
                 type="button"
                 onClick={() => onOpenFile('projects.tsx')}
-                className="px-3 py-1 rounded-xs bg-[#313131] hover:bg-[#3C3C3C] border border-[#3C3C3C] text-[#4EC9B0] text-xs font-mono cursor-pointer"
+                className="px-3 py-1.5 rounded-xs bg-[#313131] hover:bg-[#3C3C3C] border border-[#3C3C3C] text-[#4EC9B0] text-xs font-mono cursor-pointer"
               >
-                Used in {skill.projectsUsed.length} Production Apps
+                Used in: {skill.projectsUsed.join(', ')}
               </button>
             </div>
           </div>
         </div>
 
-        {/* Official Extension Sub-Tabs: Details | Feature Contributions | Changelog */}
+        {/* Sub-Tabs: Details | Portfolio Projects */}
         <div className={`flex items-center gap-6 border-b ${borderClass} text-xs`}>
           {(
             [
-              { id: 'details', label: 'Details' },
-              { id: 'features', label: 'Feature Contributions' },
-              { id: 'changelog', label: 'Changelog' },
+              { id: 'details', label: 'Details & Code Pattern' },
+              { id: 'features', label: 'Portfolio Integrations' },
             ] as const
           ).map((t) => (
             <button
@@ -959,11 +581,11 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             <div className={`lg:col-span-8 rounded-md border ${cardSurface} p-6 space-y-4`}>
               <h2 className={`text-lg font-bold ${headingText}`}>
-                {skill.name} — Production Engineering Integration
+                {skill.name} — Engineering Implementation
               </h2>
               <p className="text-xs sm:text-sm leading-relaxed">
-                {DEVELOPER_PROFILE.name} utilizes <strong>{skill.name}</strong> ({skill.experience})
-                across production applications including{' '}
+                {DEVELOPER_PROFILE.name} uses <strong>{skill.name}</strong> ({skill.experience}) across
+                portfolio applications including{' '}
                 <strong className="text-[#4EC9B0]">{skill.projectsUsed.join(', ')}</strong>.
               </p>
               <div className="space-y-1.5">
@@ -976,7 +598,7 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
 
             <div className={`lg:col-span-4 rounded-md border ${cardSurface} p-5 space-y-3 text-xs`}>
               <h3 className={`font-bold uppercase tracking-wide ${headingText}`}>
-                Marketplace Metadata
+                Technical Specification
               </h3>
               <div className="space-y-1.5 font-mono">
                 <div className="flex justify-between">
@@ -988,12 +610,12 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
                   <span className="text-[#4EC9B0]">{skill.category}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className={mutedText}>Version</span>
-                  <span>{skill.version}</span>
+                  <span className={mutedText}>Role</span>
+                  <span>{skill.experience}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className={mutedText}>Last Released</span>
-                  <span>2026-10</span>
+                  <span className={mutedText}>Version</span>
+                  <span>{skill.version}</span>
                 </div>
               </div>
             </div>
@@ -1003,21 +625,31 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
         {extSubTab === 'features' && (
           <div className={`rounded-md border ${cardSurface} p-5 space-y-3 text-xs font-mono`}>
             <p className="text-[#4EC9B0] font-semibold">
-              Contributes configuration &amp; commands to MUSTAFA.dev workspace:
+              Verified Portfolio Applications Utilizing {skill.name}:
             </p>
-            <ul className="space-y-1.5 text-[#CCCCCC]">
-              <li>• mustafa.{skill.id}.enableProductionOptimizations: true</li>
-              <li>• mustafa.{skill.id}.verifiedProjects: [{skill.projectsUsed.join(', ')}]</li>
-            </ul>
-          </div>
-        )}
-
-        {extSubTab === 'changelog' && (
-          <div className={`rounded-md border ${cardSurface} p-5 space-y-2 text-xs font-mono`}>
-            <p className="text-white font-semibold">{skill.version} — October 2026</p>
-            <p className={mutedText}>
-              • Verified production deployment in {skill.projectsUsed.join(', ')}.
-            </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {skill.projectsUsed.map((projName) => {
+                const matchedProj = projects.find(
+                  (p) => p.title.toLowerCase() === projName.toLowerCase()
+                );
+                return (
+                  <button
+                    key={projName}
+                    type="button"
+                    onClick={() => {
+                      if (matchedProj) {
+                        onSelectProject(matchedProj);
+                      } else {
+                        onOpenFile('overview.tsx');
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded bg-[#181818] border border-[#2B2B2B] hover:border-[#0078D4] text-[#4FC1FF] cursor-pointer"
+                  >
+                    {projName} ↗
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
@@ -1048,13 +680,7 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
               <strong className="text-[#4EC9B0]">{activeFile}</strong> ({lines.length} lines)
             </span>
           </div>
-          <button
-            type="button"
-            onClick={() => onTriggerSync()}
-            className="px-2.5 py-0.5 rounded bg-[#0078D4] text-white cursor-pointer"
-          >
-            Save to Cloud (Ctrl+S)
-          </button>
+          <span className="text-[#4EC9B0]">Auto-saved to workspace</span>
         </div>
         <div className="flex-1 flex min-h-[420px]">
           <div className="w-12 py-3 pr-3 text-right select-none text-[#6E7681] border-r border-[#2B2B2B] bg-[#1F1F1F]">
@@ -1139,16 +765,26 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
               </p>
 
               {/* Official Brand Skill Logos Bar right inside Hero */}
-              <div className="pt-1 flex flex-wrap items-center gap-3">
+              <div className="pt-2 flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-[#858585] mr-1">
+                  Verified Stack:
+                </span>
                 {PORTFOLIO_SKILLS.map((sk) => (
                   <button
                     key={sk.id}
                     type="button"
                     onClick={() => onOpenFile(`extension:${sk.id}`)}
-                    title={`${sk.name} — Click to open VS Code Extension Details`}
-                    className="p-2 rounded bg-[#181818] border border-[#2B2B2B] hover:border-[#0078D4] transition-colors flex items-center justify-center cursor-pointer"
+                    title={`${sk.name} (${sk.version}) — ${sk.publisher}. Click to open VS Code Extension Marketplace details`}
+                    className={`group inline-flex items-center gap-2 px-2.5 py-1.5 rounded border ${
+                      isDark
+                        ? 'bg-[#1E1E1E] border-[#333333] hover:border-[#0078D4] hover:bg-[#252526] text-[#CCCCCC]'
+                        : 'bg-white border-slate-200 hover:border-[#0078D4] hover:bg-slate-50 text-slate-800'
+                    } transition-all cursor-pointer shadow-xs text-xs font-mono`}
                   >
-                    <OfficialSkillIcon skillId={sk.id} className="w-5 h-5" />
+                    <OfficialSkillIcon skillId={sk.id} className="w-4 h-4 shrink-0" theme={theme} />
+                    <span className="group-hover:text-[#4FC1FF] transition-colors font-medium">
+                      {sk.name}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -1164,6 +800,17 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
                 <Codicon name="arrow-right" className="!text-[13px]" />
               </button>
 
+              <a
+                href={DEVELOPER_PROFILE.resumeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open MD Mustafa Hossain's Resume (PDF) in new tab"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded bg-[#0078D4] hover:bg-[#1084DF] text-white font-medium text-xs transition-colors whitespace-nowrap shrink-0 shadow-sm cursor-pointer"
+              >
+                <Codicon name="file-pdf" className="!text-[14px]" />
+                <span>Download Resume (PDF)</span>
+              </a>
+
               <button
                 type="button"
                 onClick={() => onOpenFile('contact.tsx')}
@@ -1175,16 +822,6 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
               >
                 <span>Start a Conversation</span>
               </button>
-
-              <a
-                href={DEVELOPER_PROFILE.resumeUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded border ${borderClass} hover:border-[#0078D4] text-xs font-mono transition-colors whitespace-nowrap shrink-0`}
-              >
-                <Codicon name="cloud-download" className="!text-[14px] text-[#4FC1FF]" />
-                <span>Resume.pdf</span>
-              </a>
 
               <button
                 type="button"
@@ -1220,36 +857,43 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
                   </div>
                 )}
               </div>
-
-              <div
-                className={`grid grid-cols-2 gap-4 pt-3 mt-3 border-t ${borderClass} text-xs font-mono`}
-              >
-                <div>
-                  <p className={mutedText}>location</p>
-                  <p className={`font-semibold mt-0.5 ${headingText}`}>Murshidabad, India</p>
-                </div>
-                <div>
-                  <p className={mutedText}>education</p>
-                  <p className="font-semibold mt-0.5 tabular-nums text-[#4EC9B0]">
-                    BCA · 9.09 / 10
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
         </div>
 
-        {/* Full-Width 4-Column KPI Benchmark Strip (2x2 on mobile, 4-col on desktop) */}
+        {/* Full-Width 4-Column Authentic Portfolio Summary Strip (2x2 on mobile, 4-col on desktop) */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {DEVELOPER_PROFILE.kpiMetrics.map((metric) => (
-            <div key={metric.label} className={`rounded-md border ${cardSurface} p-3 sm:p-4 space-y-1`}>
-              <p className={`text-[11px] sm:text-xs font-mono truncate ${mutedText}`}>{metric.label}</p>
-              <p className="text-xl sm:text-2xl font-bold text-[#4EC9B0] font-mono tabular-nums">
-                {metric.value}
-              </p>
-              <p className={`text-[11px] sm:text-xs ${mutedText}`}>{metric.context}</p>
-            </div>
-          ))}
+          {DEVELOPER_PROFILE.kpiMetrics.map((metric) => {
+            const isVisitorMetric = metric.label === 'Unique Visitors';
+            const displayValue = isVisitorMetric
+              ? String(visitorCount).padStart(2, '0')
+              : metric.value;
+            return (
+              <div
+                key={metric.label}
+                className={`rounded-md border ${cardSurface} p-3 sm:p-4 space-y-1`}
+              >
+                <div className="flex items-center justify-between gap-1">
+                  <p className={`text-[11px] sm:text-xs font-mono truncate ${mutedText}`}>
+                    {metric.label}
+                  </p>
+                  {isVisitorMetric && (
+                    <span
+                      className="inline-flex items-center gap-1 text-[10px] font-mono text-[#4EC9B0]"
+                      title="Live deduplicated unique visitor counter"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#4EC9B0]" />
+                      <span>LIVE</span>
+                    </span>
+                  )}
+                </div>
+                <p className="text-xl sm:text-2xl font-bold text-[#4EC9B0] font-mono tabular-nums">
+                  {displayValue}
+                </p>
+                <p className={`text-[11px] sm:text-xs ${mutedText}`}>{metric.context}</p>
+              </div>
+            );
+          })}
         </div>
 
         {/* About Me & Quick Properties Grid */}
@@ -1279,12 +923,12 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
             className={`lg:col-span-5 rounded-md border ${cardSurface} divide-y ${borderClass}`}
           >
             <div className="p-5 space-y-1">
-              <p className={`text-xs font-mono ${mutedText}`}>degree</p>
+              <p className={`text-xs font-mono ${mutedText}`}>engineeringFocus</p>
               <p className={`text-sm font-bold ${headingText}`}>
-                Bachelor of Computer Applications (BCA)
+                Component Architecture &amp; Responsive UI
               </p>
               <p className="text-xs text-[#4EC9B0] font-mono">
-                Brainware University, West Bengal · 9.09 / 10 CGPA
+                React 19 · Tailwind CSS v4 · Predictable State
               </p>
             </div>
             <div className="p-5 space-y-1">
@@ -1426,15 +1070,14 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
                         <Codicon name="source-control" className="!text-[12px]" />
                         <span>Repo</span>
                       </a>
-                      <a
-                        href={proj.demo}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#0078D4] hover:bg-[#1084DF] text-white text-xs font-mono transition-colors"
+                      <button
+                        type="button"
+                        onClick={() => onSelectProject(proj)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#0078D4] hover:bg-[#1084DF] text-white text-xs font-mono transition-colors cursor-pointer"
                       >
-                        <span>Demo</span>
-                        <Codicon name="link-external" className="!text-[12px]" />
-                      </a>
+                        <span>Case Study</span>
+                        <Codicon name="arrow-right" className="!text-[12px]" />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1518,7 +1161,7 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-3">
                     <div className="w-11 h-11 rounded-md bg-[#181818] border border-[#2B2B2B] flex items-center justify-center shrink-0">
-                      <OfficialSkillIcon skillId={skill.id} className="w-7 h-7" />
+                      <OfficialSkillIcon skillId={skill.id} className="w-7 h-7" theme={theme} />
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
@@ -1699,7 +1342,7 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
   // 6. CONTACT.TSX VIEW
   if (activeFile === 'contact.tsx') {
     return renderHybridEditorCanvas(
-      'Direct Contact Dispatch & Synchronized Developer Guestbook (contact.tsx)',
+      'Direct Contact Dispatch & Official Developer Endpoints (contact.tsx)',
       <>
         <span className="text-[#C586C0]">export async function</span>{' '}
         <span className="text-[#DCDCAA]">dispatchDirectMessage</span>
@@ -1707,10 +1350,7 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
         <span className="text-[#4EC9B0]">ContactPayload</span>
         <span className="text-[#CCCCCC]">) &#123;</span>
       </>,
-      [
-        { label: 'Sync Cloud Guestbook', onClick: () => onTriggerSync() },
-        { label: 'Open Terminal', onClick: onOpenTerminal },
-      ],
+      [{ label: 'Open Terminal', onClick: onOpenTerminal }],
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left: Direct Contact Form */}
         <div className={`lg:col-span-7 rounded-md border ${cardSurface} p-6`}>
@@ -1719,6 +1359,7 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
           </h2>
           <p className={`text-xs mb-5 ${mutedText}`}>
             Open to frontend internships, entry-level React roles, and product collaborations.
+            Messages sent below are delivered privately to {DEVELOPER_PROFILE.name}.
           </p>
 
           <form onSubmit={handleContactSubmit} className="space-y-4">
@@ -1785,16 +1426,20 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
             {contactStatus === 'success' && (
               <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded bg-[#1E3A2F] border border-[#4EC9B0]/40 text-[#4EC9B0] text-xs font-mono">
                 <span className="flex items-center gap-2">
-                  <Codicon name="check" className="!text-[14px]" />
-                  <span>Message delivered and persisted to backend inbox.</span>
+                  <Codicon name="lock" className="!text-[14px]" />
+                  <span>
+                    Message encrypted and delivered to MD Mustafa Hossain&apos;s private inbox.
+                  </span>
                 </span>
-                <button
-                  type="button"
-                  onClick={() => onOpenFile('messages-inbox.json')}
-                  className="px-2.5 py-1 rounded bg-[#0078D4] text-white hover:bg-[#1084DF] cursor-pointer"
-                >
-                  Open Inbox (messages-inbox.json)
-                </button>
+                {isOwner && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenFile('messages-inbox.json')}
+                    className="px-2.5 py-1 rounded bg-[#0078D4] text-white hover:bg-[#1084DF] cursor-pointer"
+                  >
+                    Open Owner Inbox
+                  </button>
+                )}
               </div>
             )}
 
@@ -1816,20 +1461,35 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
           </form>
         </div>
 
-        {/* Right: Direct Channels & Synchronized Peer Guestbook */}
+        {/* Right: Authentic Direct Endpoints & Location/Availability Details */}
         <div className="lg:col-span-5 space-y-5">
           <div className={`rounded-md border ${cardSurface} p-5 space-y-3`}>
-            <h3 className={`text-sm font-bold font-mono ${headingText}`}>Direct Endpoints</h3>
+            <div className="flex items-center justify-between">
+              <h3 className={`text-sm font-bold font-mono ${headingText}`}>Direct Endpoints</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(DEVELOPER_PROFILE.email);
+                  setEmailCopied(true);
+                  setTimeout(() => setEmailCopied(false), 2000);
+                }}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#181818] border border-[#2B2B2B] hover:border-[#0078D4] text-[11px] font-mono text-[#4EC9B0] cursor-pointer"
+              >
+                <Codicon name={emailCopied ? 'check' : 'copy'} className="!text-[11px]" />
+                <span>{emailCopied ? 'Email Copied' : 'Copy Email'}</span>
+              </button>
+            </div>
+
             <div className="space-y-2 text-xs font-mono">
               <a
                 href={`mailto:${DEVELOPER_PROFILE.email}`}
                 className="flex items-center justify-between py-1.5 border-b border-[#2B2B2B] text-[#4FC1FF] hover:underline"
               >
-                <span className="flex items-center gap-2">
-                  <Codicon name="mail" className="!text-[13px]" />
-                  <span>{DEVELOPER_PROFILE.email}</span>
+                <span className="flex items-center gap-2 truncate">
+                  <Codicon name="mail" className="!text-[13px] shrink-0" />
+                  <span className="truncate">{DEVELOPER_PROFILE.email}</span>
                 </span>
-                <Codicon name="link-external" className="!text-[12px]" />
+                <Codicon name="link-external" className="!text-[12px] shrink-0" />
               </a>
               {DEVELOPER_PROFILE.socials.map((soc) => (
                 <a
@@ -1846,80 +1506,30 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
             </div>
           </div>
 
-          <div className={`rounded-md border ${cardSurface} p-5 space-y-3`}>
-            <div className="flex items-center justify-between">
-              <h3 className={`text-sm font-bold font-mono ${headingText}`}>
-                Cloud Peer Guestbook
-              </h3>
-              <button
-                type="button"
-                onClick={() => onTriggerSync()}
-                className="inline-flex items-center gap-1 text-xs font-mono text-[#4EC9B0] hover:underline cursor-pointer"
-              >
-                <Codicon name="sync" className="!text-[12px]" />
-                <span>Sync #{syncStats.syncCount}</span>
-              </button>
-            </div>
-
-            <form onSubmit={handleGuestbookSubmit} className="space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="text"
-                  required
-                  value={gbAuthor}
-                  onChange={(e) => setGbAuthor(e.target.value)}
-                  placeholder="Your Name"
-                  className={`px-2.5 py-1.5 rounded border ${
-                    isDark
-                      ? 'bg-[#3C3C3C] border-[#2B2B2B] text-white'
-                      : 'bg-white border-slate-300 text-slate-900'
-                  } text-xs font-mono focus:outline-none`}
-                />
-                <input
-                  type="text"
-                  value={gbRole}
-                  onChange={(e) => setGbRole(e.target.value)}
-                  placeholder="Role / City"
-                  className={`px-2.5 py-1.5 rounded border ${
-                    isDark
-                      ? 'bg-[#3C3C3C] border-[#2B2B2B] text-white'
-                      : 'bg-white border-slate-300 text-slate-900'
-                  } text-xs font-mono focus:outline-none`}
-                />
+          <div className={`rounded-md border ${cardSurface} p-5 space-y-3 text-xs font-mono`}>
+            <h3 className={`text-sm font-bold ${headingText}`}>
+              Availability &amp; Location
+            </h3>
+            <div className={`space-y-2.5 divide-y ${borderClass}`}>
+              <div className="pt-1">
+                <p className={mutedText}>status</p>
+                <p className="text-[#4EC9B0] font-semibold mt-0.5">
+                  {DEVELOPER_PROFILE.availability}
+                </p>
               </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  required
-                  value={gbComment}
-                  onChange={(e) => setGbComment(e.target.value)}
-                  placeholder="Add developer note..."
-                  className={`flex-1 px-2.5 py-1.5 rounded border ${
-                    isDark
-                      ? 'bg-[#3C3C3C] border-[#2B2B2B] text-white'
-                      : 'bg-white border-slate-300 text-slate-900'
-                  } text-xs font-mono focus:outline-none`}
-                />
-                <button
-                  type="submit"
-                  disabled={gbSubmitting}
-                  className="px-3 py-1.5 rounded bg-[#0078D4] hover:bg-[#1084DF] text-white font-mono text-xs shrink-0 cursor-pointer"
-                >
-                  Commit
-                </button>
+              <div className="pt-2.5">
+                <p className={mutedText}>location</p>
+                <p className={`font-semibold mt-0.5 ${headingText}`}>
+                  {DEVELOPER_PROFILE.location}
+                </p>
               </div>
-            </form>
-
-            <div className={`divide-y ${borderClass} max-h-52 overflow-y-auto pt-1`}>
-              {guestbook.map((entry) => (
-                <div key={entry.id} className="py-2.5 space-y-1 text-xs">
-                  <div className="flex items-center justify-between font-mono">
-                    <span className="font-semibold text-[#4FC1FF]">{entry.author}</span>
-                    <span className={`text-[10px] ${mutedText}`}>{entry.role}</span>
-                  </div>
-                  <p className="leading-relaxed">{entry.comment}</p>
-                </div>
-              ))}
+              <div className="pt-2.5">
+                <p className={mutedText}>privacy</p>
+                <p className={`mt-0.5 leading-relaxed ${mutedText}`}>
+                  All messages submitted through this form are protected by Firebase Firestore
+                  security rules and can only be read by {DEVELOPER_PROFILE.name}.
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -1927,40 +1537,115 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
     );
   }
 
-  // 7. MESSAGES-INBOX.JSON VIEW (Persisted Contact Form & Terminal Inquiries)
+  // 7. MESSAGES-INBOX.JSON VIEW (Strictly Owner-Only via Firebase Auth + Firestore Security Rules)
   if (activeFile === 'messages-inbox.json') {
+    if (!isOwner) {
+      return renderHybridEditorCanvas(
+        'Private Owner Inbox — Restricted Access (config/messages-inbox.json)',
+        <>
+          <span className="text-[#F48771] font-semibold">403_RESTRICTED_OWNER_INBOX</span>
+        </>,
+        [],
+        <div className="max-w-2xl mx-auto py-8">
+          <div className={`rounded-md border ${cardSurface} p-6 sm:p-8 space-y-5`}>
+            <div className="flex items-start gap-4">
+              <div className="w-11 h-11 rounded-md bg-[#0078D4]/15 border border-[#0078D4]/40 flex items-center justify-center shrink-0">
+                <Codicon name="lock" className="!text-[22px] text-[#0078D4]" />
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-xs font-mono text-[#4EC9B0]">
+                  <span>FIRESTORE ZERO-TRUST SECURITY GATE</span>
+                </div>
+                <h1 className={`text-xl font-bold ${headingText}`}>
+                  Website Owner Authentication Required
+                </h1>
+                <p className={`text-xs sm:text-sm leading-relaxed ${mutedText}`}>
+                  For security and privacy, contact messages sent by visitors are stored in a
+                  protected Firebase Firestore collection and are strictly visible only to the
+                  website owner (<span className="font-mono text-[#9CDCFE]">{PORTFOLIO_OWNER_EMAIL}</span>).
+                </p>
+              </div>
+            </div>
+
+            {currentUserEmail && !isOwner && (
+              <div className="p-3.5 rounded bg-[#3A1E1E] border border-[#F48771]/40 text-[#F48771] text-xs font-mono flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  Access Denied: Signed in as <strong>{currentUserEmail}</strong> (Not Owner)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onOwnerSignOut?.()}
+                  className="px-2.5 py-1 rounded bg-[#2B2B2B] hover:bg-[#3C3C3C] text-white cursor-pointer"
+                >
+                  Sign Out
+                </button>
+              </div>
+            )}
+
+            <div className={`pt-4 border-t ${borderClass} flex flex-wrap items-center justify-between gap-3`}>
+              <button
+                type="button"
+                onClick={() => onOwnerSignIn?.()}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded bg-[#0078D4] hover:bg-[#1084DF] text-white text-xs font-semibold transition-colors cursor-pointer"
+              >
+                <Codicon name="account" className="!text-[14px]" />
+                <span>Sign in with Google (Owner Only)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onOpenFile('contact.tsx')}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded border ${borderClass} hover:border-[#0078D4] text-xs font-mono transition-colors cursor-pointer`}
+              >
+                <Codicon name="mail" className="!text-[14px] text-[#4FC1FF]" />
+                <span>Go to Public Contact Form</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     const unreadCount = messages.filter((m) => !m.read).length;
     return renderHybridEditorCanvas(
-      'Persisted Contact Inquiries & Recruiter Messages Inbox (config/messages-inbox.json)',
+      'Verified Owner Contact Inbox (config/messages-inbox.json)',
       <>
         <span className="text-[#9CDCFE]">&quot;incomingMessages&quot;</span>:{' '}
-        <span className="text-[#CCCCCC]">[</span>{' '}
-        <span className="text-[#6A9955]">
-          // {messages.length} total ({unreadCount} unread) · Visitor Sessions: {visitorCount}
-        </span>
+        <span className="text-[#CCCCCC]">[</span>
       </>,
-      [
-        { label: 'Compose New Message (contact.tsx)', onClick: () => onOpenFile('contact.tsx') },
-        { label: 'Query via Terminal (`inbox`)', onClick: onOpenTerminal },
-        { label: 'Sync Backend Store', onClick: () => onTriggerSync() },
-      ],
+      [],
       <div className="max-w-4xl space-y-6">
+        {/* Verified Owner Header Banner */}
+        <div
+          className={`flex flex-wrap items-center justify-between gap-3 p-4 rounded-md border ${cardSurface}`}
+        >
+          <div className="flex items-center gap-2.5 text-xs font-mono">
+            <Codicon name="verified-filled" className="!text-[16px] text-[#4EC9B0]" />
+            <span>
+              Authenticated Owner: <strong className={headingText}>{currentUserEmail}</strong>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => onOwnerSignOut?.()}
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded border ${borderClass} hover:border-[#F48771] text-xs font-mono text-[#F48771] cursor-pointer`}
+          >
+            <Codicon name="lock" className="!text-[12px]" />
+            <span>Lock Inbox / Sign Out</span>
+          </button>
+        </div>
+
         {/* Top Summary Strip */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-mono text-xs">
           <div className={`rounded-md border ${cardSurface} p-4 space-y-1`}>
             <p className={mutedText}>totalMessages</p>
             <p className="text-2xl font-bold text-[#4EC9B0] tabular-nums">{messages.length}</p>
-            <p className={mutedText}>Persisted in .data/portfolio-cloud-store.json</p>
+            <p className={mutedText}>Protected in Firebase Firestore</p>
           </div>
           <div className={`rounded-md border ${cardSurface} p-4 space-y-1`}>
             <p className={mutedText}>unreadInquiries</p>
             <p className="text-2xl font-bold text-[#4FC1FF] tabular-nums">{unreadCount}</p>
-            <p className={mutedText}>Real-time SSE notifications enabled</p>
-          </div>
-          <div className={`rounded-md border ${cardSurface} p-4 space-y-1`}>
-            <p className={mutedText}>portfolioVisitors</p>
-            <p className="text-2xl font-bold text-[#DCDCAA] tabular-nums">{visitorCount}</p>
-            <p className={mutedText}>Cloud Sync Revision #{syncStats.syncCount}</p>
+            <p className={mutedText}>Owner-only real-time listener</p>
           </div>
         </div>
 
@@ -1968,17 +1653,10 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
         {messages.length === 0 ? (
           <div className={`rounded-md border ${cardSurface} p-8 text-center space-y-3`}>
             <Codicon name="mail" className="!text-[28px] text-[#858585]" />
-            <p className={`text-sm font-semibold ${headingText}`}>No messages in inbox</p>
+            <p className={`text-sm font-semibold ${headingText}`}>No messages in your private inbox yet</p>
             <p className={`text-xs ${mutedText}`}>
-              Messages submitted via contact.tsx or the terminal contact command appear here automatically.
+              When visitors submit the form on contact.tsx, their messages are encrypted in Firestore and appear here in real time.
             </p>
-            <button
-              type="button"
-              onClick={() => onOpenFile('contact.tsx')}
-              className="px-4 py-1.5 rounded bg-[#0078D4] hover:bg-[#1084DF] text-white text-xs font-medium cursor-pointer"
-            >
-              Send a Test Message
-            </button>
           </div>
         ) : (
           <div className="space-y-3">
@@ -2068,10 +1746,6 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
           <span className="text-[#CE9178]">&quot;{DEVELOPER_PROFILE.email}&quot;</span>,
         </div>
         <div>
-          <span className="text-[#9CDCFE]">&quot;education&quot;</span>:{' '}
-          <span className="text-[#CE9178]">&quot;{DEVELOPER_PROFILE.educationShort}&quot;</span>,
-        </div>
-        <div>
           <span className="text-[#9CDCFE]">&quot;scripts&quot;</span>: &#123;
           <div className="pl-4 space-y-1 py-1">
             <div>
@@ -2080,11 +1754,7 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
             </div>
             <div>
               <span className="text-[#9CDCFE]">&quot;build&quot;</span>:{' '}
-              <span className="text-[#CE9178]">&quot;vite build&quot;</span>,
-            </div>
-            <div>
-              <span className="text-[#9CDCFE]">&quot;sync&quot;</span>:{' '}
-              <span className="text-[#CE9178]">&quot;curl -X POST /api/sync&quot;</span>
+              <span className="text-[#CE9178]">&quot;vite build&quot;</span>
             </div>
           </div>
           &#125;,
