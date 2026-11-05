@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Codicon, OfficialGeminiLogo, SetiFileIcon } from './OfficialIcons';
 import { DEVELOPER_PROFILE, WORKSPACE_FILES } from '../data/portfolioData';
+import { askGemini } from '../services/geminiClient';
 
 export interface GeminiChatMessage {
   id: string;
@@ -117,31 +118,20 @@ export const GeminiChatPanel: React.FC<GeminiChatPanelProps> = ({
     const tempAiId = `model-${Date.now()}`;
 
     try {
-      const response = await fetch('/api/gemini/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: trimmed,
-          history: historyForApi,
-        }),
-      });
-
-      const data = await response.json();
-      if (!response.ok || data.error) {
-        throw new Error(data.error || 'Failed to get response from Gemini AI.');
-      }
+      const data = await askGemini(trimmed, historyForApi);
 
       if (typeof data.model === 'string' && data.model) {
         setActiveModel(data.model);
       }
 
-      const generatedThoughts = Array.isArray(data.thoughts) && data.thoughts.length > 0
-        ? data.thoughts
-        : [
-            'Analyzing query in MD Mustafa Hossain’s frontend engineering context',
-            'Synthesizing projects, technologies, and academic records',
-            'Formulating response with direct references'
-          ];
+      const generatedThoughts =
+        Array.isArray(data.thoughts) && data.thoughts.length > 0
+          ? data.thoughts
+          : [
+              'Analyzing query in MD Mustafa Hossain’s frontend engineering context',
+              'Synthesizing projects, technologies, and academic records',
+              'Formulating response with direct references',
+            ];
 
       const aiMsg: GeminiChatMessage = {
         id: tempAiId,

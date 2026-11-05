@@ -5,7 +5,7 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    base: '/portfolio-vscode-theme/',
+    base: process.env.NODE_ENV === 'production' || process.env.GITHUB_ACTIONS ? '/portfolio-vscode-theme/' : '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
