@@ -266,8 +266,7 @@ function generateLocalPortfolioAnswer(
 /**
  * Main export: Unified Gemini AI Chat Client
  * 1. Tries server API (/api/gemini/chat) if server backend is running.
- * 2. If running on static hosting (e.g. GitHub Pages) and VITE_GEMINI_API_KEY is provided, calls Google REST API directly.
- * 3. Otherwise, activates the intelligent Portfolio Gemini Knowledge Engine with zero network errors.
+ * 2. Otherwise, activates the intelligent Portfolio Gemini Knowledge Engine with zero network errors.
  */
 export async function askGemini(
   message: string,
@@ -318,56 +317,6 @@ export async function askGemini(
     // Gracefully proceed to static fallback mechanisms.
   }
 
-  // 2. Check for optional client-side API key (e.g. configured in GitHub Actions secret VITE_GEMINI_API_KEY)
-  const clientKey = (import.meta as unknown as { env?: Record<string, string> })?.env
-    ?.VITE_GEMINI_API_KEY;
-
-  if (typeof clientKey === 'string' && clientKey.trim().length > 10) {
-    try {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${clientKey.trim()}`;
-      const contents = [
-        ...history.slice(-8).map((h) => ({
-          role: h.role,
-          parts: [{ text: h.text }],
-        })),
-        {
-          role: 'user',
-          parts: [{ text: trimmed }],
-        },
-      ];
-
-      const directRes = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [{ text: SYSTEM_PROMPT }],
-          },
-          contents,
-        }),
-      });
-
-      if (directRes.ok) {
-        const directData = await directRes.json();
-        const candidateText =
-          directData?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (typeof candidateText === 'string' && candidateText.trim()) {
-          return {
-            reply: candidateText.trim(),
-            thoughts: [
-              'Querying Gemini 2.5 Flash via Direct Cloud API',
-              'Applying portfolio grounding system instructions',
-              'Streaming response tokens',
-            ],
-            model: 'gemini-2.5-flash (Live Cloud)',
-          };
-        }
-      }
-    } catch (_directErr) {
-      // Fall through to local intelligent engine
-    }
-  }
-
-  // 3. Resilient Built-in Portfolio Knowledge & Reasoning Engine (Instant, Offline & GitHub Pages Ready)
+  // 2. Resilient Built-in Portfolio Knowledge & Reasoning Engine (Instant, Offline & GitHub Pages Ready)
   return generateLocalPortfolioAnswer(trimmed, history);
 }
