@@ -4,7 +4,16 @@ import {
   OfficialVSCodeLogo,
   SetiFileIcon,
   OfficialSkillIcon,
-  OfficialGeminiLogo,
+  WindowMinimizeIcon,
+  WindowMaximizeIcon,
+  WindowRestoreIcon,
+  WindowCloseIcon,
+  MacCloseIcon,
+  MacMinimizeIcon,
+  MacMaximizeIcon,
+  GnomeMinimizeIcon,
+  GnomeMaximizeIcon,
+  GnomeCloseIcon,
 } from './components/OfficialIcons';
 import {
   DEVELOPER_PROFILE,
@@ -25,7 +34,6 @@ import { TerminalPanel, BottomPanelTab } from './components/TerminalPanel';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { ProjectCaseStudyModal } from './components/ProjectCaseStudyModal';
 import { SourceCodeView } from './components/SourceCodeView';
-import { GeminiChatPanel } from './components/GeminiChatPanel';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { MobileTouchBar } from './components/MobileTouchBar';
 import { OSSwitcherModal } from './components/OSSwitcherModal';
@@ -45,7 +53,7 @@ import {
   subscribeToOwnerMessages,
 } from './firebase';
 
-type ActivityViewId = 'explorer' | 'search' | 'extensions' | 'gemini';
+type ActivityViewId = 'explorer' | 'search' | 'extensions';
 type EditorViewMode = 'hybrid' | 'code' | 'split';
 type MenuId = 'File' | 'View' | 'Go' | 'Terminal' | 'Help' | null;
 
@@ -1011,7 +1019,7 @@ export default function App() {
     <div className={`h-screen-dynamic w-screen overflow-hidden flex flex-col select-none ${chromeBg} safe-top safe-left safe-right relative`}>
       {/* 1. CROSS-PLATFORM VS CODE TITLE BAR (Supports macOS, Windows 11, Linux, Android, iOS) */}
       <header
-        className={`h-9 md:h-[35px] flex items-center justify-between px-2 sm:px-2.5 border-b ${borderCol} ${chromeBg} text-[12px] shrink-0 relative z-40`}
+        className={`h-9 md:h-[35px] flex items-center justify-between px-2 sm:px-2.5 border-b ${borderCol} ${chromeBg} text-[12px] shrink-0 relative z-50`}
       >
         {/* Left: macOS Traffic Lights OR Windows/Linux/Mobile Brand Logo */}
         <div className="flex items-center gap-1.5 min-w-0">
@@ -1022,25 +1030,31 @@ export default function App() {
                 type="button"
                 onClick={() => handleCloseTab(null, activeFile)}
                 title="Close Window / Tab (⌘W)"
-                className="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:opacity-80 flex items-center justify-center cursor-pointer text-[8px] text-black/60 group-hover:text-black"
+                className="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:opacity-90 flex items-center justify-center cursor-pointer text-black/75 transition-opacity"
               >
-                <span className="opacity-0 group-hover:opacity-100">✕</span>
+                <span className="opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                  <MacCloseIcon className="w-1.5 h-1.5" />
+                </span>
               </button>
               <button
                 type="button"
                 onClick={() => setTerminalOpen((prev) => !prev)}
                 title="Minimize Panel (⌘M)"
-                className="w-3 h-3 rounded-full bg-[#FFBD2E] border border-[#DEA123] hover:opacity-80 flex items-center justify-center cursor-pointer text-[8px] text-black/60 group-hover:text-black"
+                className="w-3 h-3 rounded-full bg-[#FFBD2E] border border-[#DEA123] hover:opacity-90 flex items-center justify-center cursor-pointer text-black/75 transition-opacity"
               >
-                <span className="opacity-0 group-hover:opacity-100">−</span>
+                <span className="opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                  <MacMinimizeIcon className="w-1.5 h-1.5" />
+                </span>
               </button>
               <button
                 type="button"
                 onClick={() => setEditorMode((prev) => (prev === 'split' ? 'hybrid' : 'split'))}
                 title="Zoom / Split Editor (⌘F)"
-                className="w-3 h-3 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:opacity-80 flex items-center justify-center cursor-pointer text-[8px] text-black/60 group-hover:text-black"
+                className="w-3 h-3 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:opacity-90 flex items-center justify-center cursor-pointer text-black/75 transition-opacity"
               >
-                <span className="opacity-0 group-hover:opacity-100">+</span>
+                <span className="opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                  <MacMaximizeIcon className="w-1.5 h-1.5" />
+                </span>
               </button>
             </div>
           )}
@@ -1084,10 +1098,14 @@ export default function App() {
                     onMouseEnter={() => {
                       if (openMenu !== null) setOpenMenu(menuName);
                     }}
-                    className={`px-2 py-0.5 rounded text-[12px] cursor-pointer whitespace-nowrap shrink-0 ${
+                    className={`px-2 py-0.5 rounded text-[12px] cursor-pointer whitespace-nowrap shrink-0 transition-colors ${
                       isMenuOpen
-                        ? 'bg-[#2A2D2E] text-white'
-                        : 'text-[#CCCCCC] hover:bg-[#2A2D2E]'
+                        ? isDark
+                          ? 'bg-[#2A2D2E] text-white'
+                          : 'bg-[#E4E6F1] text-[#1E1E1E] font-medium'
+                        : isDark
+                        ? 'text-[#CCCCCC] hover:bg-[#2A2D2E]'
+                        : 'text-[#333333] hover:bg-[#E8E8E8]'
                     }`}
                   >
                     {menuName}
@@ -1096,16 +1114,26 @@ export default function App() {
                   {isMenuOpen && (
                     <>
                       <div
-                        className="fixed inset-0 z-40"
+                        className="fixed inset-0 z-[998]"
                         onClick={() => setOpenMenu(null)}
                       />
-                      <div className="absolute left-0 top-7 w-72 rounded-md border border-[#454545] bg-[#252526] text-[#CCCCCC] shadow-[0_8px_24px_rgba(0,0,0,0.65)] py-1 z-50 text-xs">
+                      <div
+                        className={`absolute left-0 top-7 w-72 rounded-md border ${
+                          isDark
+                            ? 'border-[#454545] bg-[#252526] text-[#CCCCCC]'
+                            : 'border-[#D4D4D4] bg-white text-[#1E1E1E]'
+                        } shadow-[0_8px_24px_rgba(0,0,0,0.35)] py-1 z-[999] text-xs`}
+                      >
                         {menuDefinitions[menuName].map((item) => (
                           <React.Fragment key={item.label}>
                             <button
                               type="button"
                               onClick={item.action}
-                              className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#04395E] hover:text-white text-left cursor-pointer"
+                              className={`w-full flex items-center justify-between px-3 py-1.5 ${
+                                isDark
+                                  ? 'hover:bg-[#04395E] hover:text-white'
+                                  : 'hover:bg-[#0078D4] hover:text-white'
+                              } text-left cursor-pointer transition-colors`}
                             >
                               <span className="flex items-center gap-2">
                                 <span className="w-3.5 flex items-center justify-center">
@@ -1116,13 +1144,13 @@ export default function App() {
                                 <span>{item.label}</span>
                               </span>
                               {item.shortcut && (
-                                <span className="font-mono text-[10px] text-[#858585]">
+                                <span className={`font-mono text-[10px] ${isDark ? 'text-[#858585]' : 'text-slate-500'}`}>
                                   {formatShortcut(item.shortcut, activeOS)}
                                 </span>
                               )}
                             </button>
                             {item.dividerAfter && (
-                              <div className="my-1 border-t border-[#3C3C3C]" />
+                              <div className={`my-1 border-t ${isDark ? 'border-[#3C3C3C]' : 'border-slate-200'}`} />
                             )}
                           </React.Fragment>
                         ))}
@@ -1143,7 +1171,9 @@ export default function App() {
               onClick={handleNavBack}
               disabled={navHistoryIdx <= 0}
               title={`Go Back (${formatShortcut('Alt+Left', activeOS)})`}
-              className="p-1 rounded hover:bg-[#2A2D2E] disabled:opacity-35 text-[#CCCCCC] flex items-center justify-center cursor-pointer"
+              className={`p-1 rounded disabled:opacity-35 flex items-center justify-center cursor-pointer transition-colors ${
+                isDark ? 'hover:bg-[#2A2D2E] text-[#CCCCCC]' : 'hover:bg-[#E8E8E8] text-[#333333]'
+              }`}
             >
               <Codicon name="arrow-left" className="!text-[14px]" />
             </button>
@@ -1152,7 +1182,9 @@ export default function App() {
               onClick={handleNavForward}
               disabled={navHistoryIdx >= navHistory.length - 1}
               title={`Go Forward (${formatShortcut('Alt+Right', activeOS)})`}
-              className="p-1 rounded hover:bg-[#2A2D2E] disabled:opacity-35 text-[#CCCCCC] flex items-center justify-center cursor-pointer"
+              className={`p-1 rounded disabled:opacity-35 flex items-center justify-center cursor-pointer transition-colors ${
+                isDark ? 'hover:bg-[#2A2D2E] text-[#CCCCCC]' : 'hover:bg-[#E8E8E8] text-[#333333]'
+              }`}
             >
               <Codicon name="arrow-right" className="!text-[14px]" />
             </button>
@@ -1173,24 +1205,24 @@ export default function App() {
           </button>
         </div>
 
-        {/* Right: OS Switcher, PWA Install, Resume PDF, and Window Controls */}
+        {/* Right: Quick Theme Switcher, PWA Install, Resume PDF, and Window Controls */}
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-          {/* Interactive OS Switcher Pill */}
+          {/* Dedicated Instant Theme Switcher Button */}
           <button
             type="button"
-            onClick={() => setOSModalOpen(true)}
-            title={`Active OS: ${OS_META[activeOS].name} (${isAutoOS ? 'Auto-Detected' : 'Manual'}). Click to switch layout!`}
-            className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-[4px] border border-[#3C3C3C] hover:bg-[#2A2D2E] text-[11px] font-mono text-[#CCCCCC] transition-colors cursor-pointer shrink-0"
+            onClick={() => handleToggleTheme()}
+            title={`Switch to ${isDark ? 'Light Modern' : 'Dark Modern'} Theme (${formatShortcut('Alt+T', activeOS)})`}
+            className={`inline-flex items-center gap-1.5 h-[22px] px-2 rounded-[4px] border ${
+              isDark
+                ? 'border-[#3C3C3C] bg-[#252526] hover:bg-[#2A2D2E] text-[#CCCCCC]'
+                : 'border-slate-300 bg-white hover:bg-slate-100 text-slate-800 shadow-2xs'
+            } text-[11px] font-sans font-medium transition-colors cursor-pointer shrink-0`}
           >
-            <span className="text-xs">
-              {activeOS === 'macos' && '🍎'}
-              {activeOS === 'windows' && '🪟'}
-              {activeOS === 'linux' && '🐧'}
-              {activeOS === 'android' && '🤖'}
-              {activeOS === 'ios' && '📱'}
-            </span>
-            <span className="hidden sm:inline font-medium">{OS_META[activeOS].name}</span>
-            <Codicon name="chevron-down" className="!text-[10px] text-[#858585]" />
+            <Codicon
+              name={isDark ? 'color-mode' : 'lightbulb'}
+              className={`!text-[12px] ${isDark ? 'text-[#DCDCAA]' : 'text-amber-500'}`}
+            />
+            <span className="hidden md:inline">{isDark ? 'Dark Theme' : 'Light Theme'}</span>
           </button>
 
           {/* In-App PWA Install Action */}
@@ -1202,7 +1234,7 @@ export default function App() {
             target="_blank"
             rel="noopener noreferrer"
             title="Download / View MD Mustafa Hossain's Resume (PDF)"
-            className="hidden sm:inline-flex items-center gap-1.5 h-[22px] px-2.5 rounded-[4px] bg-[#0078D4] hover:bg-[#1084DF] text-white text-[11px] font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="hidden sm:inline-flex items-center gap-1.5 h-[22px] px-2.5 rounded-[4px] bg-[#0078D4] hover:bg-[#1084DF] text-white text-[11px] font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer shadow-2xs"
           >
             <Codicon name="file-pdf" className="!text-[12px]" />
             <span>Resume</span>
@@ -1213,7 +1245,9 @@ export default function App() {
             type="button"
             onClick={() => setSidebarOpen((prev) => !prev)}
             title={`Toggle Primary Side Bar (${formatShortcut('Ctrl+B', activeOS)})`}
-            className="p-1 rounded hover:bg-[#2A2D2E] text-[#CCCCCC] flex items-center justify-center cursor-pointer"
+            className={`p-1 rounded flex items-center justify-center cursor-pointer transition-colors ${
+              isDark ? 'hover:bg-[#2A2D2E] text-[#CCCCCC]' : 'hover:bg-[#E8E8E8] text-[#333333]'
+            }`}
           >
             <Codicon
               name={sidebarOpen ? 'layout-sidebar-left' : 'layout-sidebar-left-off'}
@@ -1226,7 +1260,9 @@ export default function App() {
             type="button"
             onClick={() => setTerminalOpen((prev) => !prev)}
             title={`Toggle Terminal Panel (${formatShortcut('Ctrl+`', activeOS)})`}
-            className="p-1 rounded hover:bg-[#2A2D2E] text-[#CCCCCC] flex items-center justify-center cursor-pointer"
+            className={`p-1 rounded flex items-center justify-center cursor-pointer transition-colors ${
+              isDark ? 'hover:bg-[#2A2D2E] text-[#CCCCCC]' : 'hover:bg-[#E8E8E8] text-[#333333]'
+            }`}
           >
             <Codicon
               name={terminalOpen ? 'layout-panel' : 'layout-panel-off'}
@@ -1236,60 +1272,72 @@ export default function App() {
 
           {/* Windows 11 Fluent Window Controls */}
           {activeOS === 'windows' && (
-            <div className="hidden sm:flex items-center ml-1 border-l border-[#3C3C3C] pl-1">
+            <div className={`hidden sm:flex items-center ml-1 border-l ${isDark ? 'border-[#3C3C3C]' : 'border-slate-300'} pl-1`}>
               <button
                 type="button"
                 onClick={() => setTerminalOpen((prev) => !prev)}
                 title="Minimize Terminal"
-                className="w-7 h-[22px] flex items-center justify-center hover:bg-[#2A2D2E] text-[#CCCCCC] cursor-pointer text-xs"
+                className={`w-7 h-[22px] flex items-center justify-center cursor-pointer text-xs transition-colors ${
+                  isDark ? 'hover:bg-[#2A2D2E] text-[#CCCCCC]' : 'hover:bg-slate-200 text-slate-800'
+                }`}
               >
-                <span>−</span>
+                <WindowMinimizeIcon className="w-2.5 h-2.5" />
               </button>
               <button
                 type="button"
                 onClick={() => setEditorMode((prev) => (prev === 'split' ? 'hybrid' : 'split'))}
-                title="Maximize / Restore Split Editor"
-                className="w-7 h-[22px] flex items-center justify-center hover:bg-[#2A2D2E] text-[#CCCCCC] cursor-pointer text-xs"
+                title={editorMode === 'split' ? 'Restore Editor' : 'Maximize / Split Editor'}
+                className={`w-7 h-[22px] flex items-center justify-center cursor-pointer text-xs transition-colors ${
+                  isDark ? 'hover:bg-[#2A2D2E] text-[#CCCCCC]' : 'hover:bg-slate-200 text-slate-800'
+                }`}
               >
-                <span>□</span>
+                {editorMode === 'split' ? (
+                  <WindowRestoreIcon className="w-2.5 h-2.5" />
+                ) : (
+                  <WindowMaximizeIcon className="w-2.5 h-2.5" />
+                )}
               </button>
               <button
                 type="button"
                 onClick={() => handleCloseTab(null, activeFile)}
                 title="Close Tab"
-                className="w-7 h-[22px] flex items-center justify-center hover:bg-[#E81123] hover:text-white text-[#CCCCCC] cursor-pointer text-xs"
+                className="w-7 h-[22px] flex items-center justify-center hover:bg-[#E81123] hover:text-white text-[#858585] cursor-pointer text-xs transition-colors"
               >
-                <span>✕</span>
+                <WindowCloseIcon className="w-2.5 h-2.5" />
               </button>
             </div>
           )}
 
           {/* Linux GNOME Rounded Controls */}
           {activeOS === 'linux' && (
-            <div className="hidden sm:flex items-center gap-1 ml-1 border-l border-[#3C3C3C] pl-1.5 select-none">
+            <div className={`hidden sm:flex items-center gap-1 ml-1 border-l ${isDark ? 'border-[#3C3C3C]' : 'border-slate-300'} pl-1.5 select-none`}>
               <button
                 type="button"
                 onClick={() => setTerminalOpen((prev) => !prev)}
                 title="Minimize"
-                className="w-4 h-4 rounded-full bg-[#3C3C3C] hover:bg-[#4C4C4C] text-white flex items-center justify-center text-[10px] cursor-pointer font-bold"
+                className={`w-4 h-4 rounded-full ${
+                  isDark ? 'bg-[#3C3C3C] hover:bg-[#4C4C4C] text-[#CCCCCC]' : 'bg-slate-300 hover:bg-slate-400 text-slate-800'
+                } flex items-center justify-center cursor-pointer transition-colors`}
               >
-                −
+                <GnomeMinimizeIcon className="w-2 h-2" />
               </button>
               <button
                 type="button"
                 onClick={() => setEditorMode((prev) => (prev === 'split' ? 'hybrid' : 'split'))}
                 title="Maximize / Restore"
-                className="w-4 h-4 rounded-full bg-[#3C3C3C] hover:bg-[#4C4C4C] text-white flex items-center justify-center text-[10px] cursor-pointer font-bold"
+                className={`w-4 h-4 rounded-full ${
+                  isDark ? 'bg-[#3C3C3C] hover:bg-[#4C4C4C] text-[#CCCCCC]' : 'bg-slate-300 hover:bg-slate-400 text-slate-800'
+                } flex items-center justify-center cursor-pointer transition-colors`}
               >
-                +
+                <GnomeMaximizeIcon className="w-2 h-2" />
               </button>
               <button
                 type="button"
                 onClick={() => handleCloseTab(null, activeFile)}
                 title="Close"
-                className="w-4 h-4 rounded-full bg-[#E95420] hover:bg-[#D84918] text-white flex items-center justify-center text-[10px] cursor-pointer font-bold"
+                className="w-4 h-4 rounded-full bg-[#E95420] hover:bg-[#D84918] text-white flex items-center justify-center cursor-pointer transition-colors"
               >
-                ×
+                <GnomeCloseIcon className="w-2 h-2" />
               </button>
             </div>
           )}
@@ -1417,8 +1465,10 @@ export default function App() {
                     active
                       ? isDark
                         ? 'text-white'
-                        : 'text-[#1F1F1F]'
-                      : 'text-[#868686] hover:text-[#D7D7D7]'
+                        : 'text-[#0078D4]'
+                      : isDark
+                      ? 'text-[#868686] hover:text-[#D7D7D7]'
+                      : 'text-[#555555] hover:text-[#1F1F1F]'
                   }`}
                 >
                   {active && (
@@ -1433,41 +1483,17 @@ export default function App() {
                 </button>
               );
             })}
-
-            {/* Official Google Gemini AI Assistant Icon directly under Extensions */}
-            <button
-              type="button"
-              onClick={() => handleActivityClick('gemini')}
-              title="Gemini AI Assistant"
-              className={`relative w-11 h-11 sm:w-12 sm:h-12 min-w-[44px] min-h-[44px] flex items-center justify-center transition-opacity cursor-pointer ${
-                activityView === 'gemini' && sidebarOpen
-                  ? 'opacity-100'
-                  : 'opacity-85 hover:opacity-100'
-              }`}
-            >
-              {activityView === 'gemini' && sidebarOpen && (
-                <span className="absolute left-0 top-0 bottom-0 w-[2px] bg-[#0078D4]" />
-              )}
-              <OfficialGeminiLogo className="w-[22px] h-[22px] sm:w-6 sm:h-6" />
-            </button>
           </div>
 
-          {/* Bottom Official Theme & Settings Icons */}
+          {/* Bottom Official Settings Icon */}
           <div className="flex flex-col items-center w-full relative">
-            <button
-              type="button"
-              onClick={() => handleToggleTheme()}
-              title={`Switch to ${isDark ? 'Light Modern' : 'Dark Modern'} Theme (Alt+T)`}
-              className="relative w-11 h-11 sm:w-12 sm:h-12 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#868686] hover:text-[#D7D7D7] transition-colors cursor-pointer"
-            >
-              <Codicon name={isDark ? 'color-mode' : 'lightbulb'} className="!text-[20px] sm:!text-[22px]" />
-            </button>
-
             <button
               type="button"
               onClick={() => setSettingsMenuOpen((prev) => !prev)}
               title="Manage / Settings (Ctrl+,)"
-              className="relative w-11 h-11 sm:w-12 sm:h-12 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#868686] hover:text-[#D7D7D7] transition-colors cursor-pointer"
+              className={`relative w-11 h-11 sm:w-12 sm:h-12 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors cursor-pointer ${
+                isDark ? 'text-[#868686] hover:text-white' : 'text-[#555555] hover:text-[#1F1F1F]'
+              }`}
             >
               <Codicon name="settings-gear" className="!text-[22px] sm:!text-[24px]" />
             </button>
@@ -1477,7 +1503,11 @@ export default function App() {
               <div onClick={() => setSettingsMenuOpen(false)} className="fixed inset-0 z-40">
                 <div
                   onClick={(e) => e.stopPropagation()}
-                  className="absolute left-12 bottom-2 w-64 rounded-md border border-[#454545] bg-[#252526] text-[#CCCCCC] shadow-xl py-1 text-xs z-50"
+                  className={`absolute left-12 bottom-2 w-64 rounded-md border ${
+                    isDark
+                      ? 'border-[#454545] bg-[#252526] text-[#CCCCCC]'
+                      : 'border-[#D4D4D4] bg-white text-[#1E1E1E] shadow-xl'
+                  } shadow-xl py-1 text-xs z-50`}
                 >
                   <button
                     type="button"
@@ -1485,22 +1515,26 @@ export default function App() {
                       openQuickPick('> ');
                       setSettingsMenuOpen(false);
                     }}
-                    className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#04395E] hover:text-white text-left cursor-pointer"
+                    className={`w-full flex items-center justify-between px-3 py-1.5 ${
+                      isDark ? 'hover:bg-[#04395E] hover:text-white' : 'hover:bg-[#0078D4] hover:text-white'
+                    } text-left cursor-pointer transition-colors`}
                   >
                     <span>Command Palette...</span>
-                    <span className="font-mono text-[10px] text-[#858585]">Ctrl+Shift+P</span>
+                    <span className={`font-mono text-[10px] ${isDark ? 'text-[#858585]' : 'text-slate-500'}`}>Ctrl+Shift+P</span>
                   </button>
-                  <div className="my-1 border-t border-[#3C3C3C]" />
+                  <div className={`my-1 border-t ${isDark ? 'border-[#3C3C3C]' : 'border-slate-200'}`} />
                   <button
                     type="button"
                     onClick={() => {
                       handleOpenFile('settings');
                       setSettingsMenuOpen(false);
                     }}
-                    className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#04395E] hover:text-white text-left cursor-pointer"
+                    className={`w-full flex items-center justify-between px-3 py-1.5 ${
+                      isDark ? 'hover:bg-[#04395E] hover:text-white' : 'hover:bg-[#0078D4] hover:text-white'
+                    } text-left cursor-pointer transition-colors`}
                   >
                     <span>Settings</span>
-                    <span className="font-mono text-[10px] text-[#858585]">Ctrl+,</span>
+                    <span className={`font-mono text-[10px] ${isDark ? 'text-[#858585]' : 'text-slate-500'}`}>Ctrl+,</span>
                   </button>
                   <button
                     type="button"
@@ -1509,10 +1543,26 @@ export default function App() {
                       setSidebarOpen(true);
                       setSettingsMenuOpen(false);
                     }}
-                    className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#04395E] hover:text-white text-left cursor-pointer"
+                    className={`w-full flex items-center justify-between px-3 py-1.5 ${
+                      isDark ? 'hover:bg-[#04395E] hover:text-white' : 'hover:bg-[#0078D4] hover:text-white'
+                    } text-left cursor-pointer transition-colors`}
                   >
                     <span>Extensions</span>
-                    <span className="font-mono text-[10px] text-[#858585]">Ctrl+Shift+X</span>
+                    <span className={`font-mono text-[10px] ${isDark ? 'text-[#858585]' : 'text-slate-500'}`}>Ctrl+Shift+X</span>
+                  </button>
+                  <div className={`my-1 border-t ${isDark ? 'border-[#3C3C3C]' : 'border-slate-200'}`} />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleToggleTheme();
+                      setSettingsMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-1.5 ${
+                      isDark ? 'hover:bg-[#04395E] hover:text-white' : 'hover:bg-[#0078D4] hover:text-white'
+                    } text-left cursor-pointer transition-colors`}
+                  >
+                    <span>Color Theme ({isDark ? 'Switch to Light' : 'Switch to Dark'})</span>
+                    <span className={`font-mono text-[10px] ${isDark ? 'text-[#858585]' : 'text-slate-500'}`}>Alt+T</span>
                   </button>
                   <div className="my-1 border-t border-[#3C3C3C]" />
                   <button
@@ -1548,9 +1598,7 @@ export default function App() {
           aria-label="VS Code Primary Side Bar"
           className={`${
             sidebarOpen || mobileDrawerOpen
-              ? `fixed top-[35px] bottom-[22px] left-11 sm:left-12 z-40 w-[min(20rem,calc(100vw-2.75rem))] sm:w-72 shadow-2xl flex md:static md:shadow-none ${
-                  activityView === 'gemini' ? 'md:w-72 lg:w-80' : 'md:w-56 lg:w-64'
-                }`
+              ? 'fixed top-[35px] bottom-[22px] left-11 sm:left-12 z-40 w-[min(20rem,calc(100vw-2.75rem))] sm:w-72 shadow-2xl flex md:static md:shadow-none md:w-56 lg:w-64'
               : 'hidden'
           } flex-col border-r ${borderCol} ${chromeBg} shrink-0`}
         >
@@ -1560,7 +1608,6 @@ export default function App() {
               {activityView === 'explorer' && 'EXPLORER'}
               {activityView === 'search' && 'SEARCH'}
               {activityView === 'extensions' && 'EXTENSIONS'}
-              {activityView === 'gemini' && 'GEMINI AI ASSISTANT'}
             </span>
             <div className="flex items-center gap-0.5 relative">
               {activityView === 'explorer' && (
@@ -1648,11 +1695,13 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => setSrcRootExpanded((prev) => !prev)}
-                      className="w-full min-h-[44px] md:min-h-0 flex items-center gap-1.5 pl-3 pr-2 py-2 md:py-0.5 hover:bg-[#2A2D2E] text-left cursor-pointer text-[13px] text-[#CCCCCC]"
+                      className={`w-full min-h-[44px] md:min-h-0 flex items-center gap-1.5 pl-3 pr-2 py-2 md:py-0.5 text-left cursor-pointer text-[13px] ${
+                        isDark ? 'hover:bg-[#2A2D2E] text-[#CCCCCC]' : 'hover:bg-[#E8E8E8] text-[#333333]'
+                      }`}
                     >
                       <Codicon
                         name={srcRootExpanded ? 'chevron-down' : 'chevron-right'}
-                        className="!text-[14px] text-[#CCCCCC] shrink-0"
+                        className={`!text-[14px] shrink-0 ${isDark ? 'text-[#CCCCCC]' : 'text-[#616161]'}`}
                       />
                       <Codicon
                         name={srcRootExpanded ? 'folder-opened' : 'folder'}
@@ -1662,7 +1711,7 @@ export default function App() {
                     </button>
 
                     {srcRootExpanded && (
-                      <div className="ml-[19px] border-l border-[#2B2B2B]">
+                      <div className={`ml-[19px] border-l ${isDark ? 'border-[#2B2B2B]' : 'border-[#E0E0E0]'}`}>
                         {/* Inline New Folder Creator inside src/ */}
                         {creatingNewFolder && (
                           <form
@@ -1687,7 +1736,11 @@ export default function App() {
                               onChange={(e) => setNewFolderNameInput(e.target.value)}
                               onBlur={() => setCreatingNewFolder(false)}
                               placeholder="folder-name"
-                              className="w-full px-1.5 py-1 md:py-0.5 bg-[#3C3C3C] border border-[#0078D4] text-xs text-white focus:outline-none"
+                              className={`w-full px-1.5 py-1 md:py-0.5 text-xs focus:outline-none border ${
+                                isDark
+                                  ? 'bg-[#3C3C3C] border-[#0078D4] text-white'
+                                  : 'bg-white border-[#0078D4] text-[#1E1E1E]'
+                              }`}
                             />
                           </form>
                         )}
@@ -1696,12 +1749,14 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => setSrcFolderExpanded((prev) => !prev)}
-                          className="w-full min-h-[44px] md:min-h-0 flex items-center justify-between pl-2.5 pr-2 py-2 md:py-0.5 hover:bg-[#2A2D2E] text-left cursor-pointer text-[13px] text-[#CCCCCC]"
+                          className={`w-full min-h-[44px] md:min-h-0 flex items-center justify-between pl-2.5 pr-2 py-2 md:py-0.5 text-left cursor-pointer text-[13px] ${
+                            isDark ? 'hover:bg-[#2A2D2E] text-[#CCCCCC]' : 'hover:bg-[#E8E8E8] text-[#333333]'
+                          }`}
                         >
                           <span className="flex items-center gap-1.5 truncate">
                             <Codicon
                               name={srcFolderExpanded ? 'chevron-down' : 'chevron-right'}
-                              className="!text-[14px] text-[#CCCCCC] shrink-0"
+                              className={`!text-[14px] shrink-0 ${isDark ? 'text-[#CCCCCC]' : 'text-[#616161]'}`}
                             />
                             <Codicon
                               name={srcFolderExpanded ? 'folder-opened' : 'folder'}
@@ -1716,7 +1771,7 @@ export default function App() {
                         </button>
 
                         {srcFolderExpanded && (
-                          <div className="ml-[17px] border-l border-[#2B2B2B]">
+                          <div className={`ml-[17px] border-l ${isDark ? 'border-[#2B2B2B]' : 'border-[#E0E0E0]'}`}>
                             {/* Inline New File Creator Row (Official VS Code Explorer Behavior) */}
                             {creatingNewFile && (
                               <form
@@ -1738,7 +1793,11 @@ export default function App() {
                                   onChange={(e) => setNewFileNameInput(e.target.value)}
                                   onBlur={() => setCreatingNewFile(false)}
                                   placeholder="new-page.tsx"
-                                  className="w-full px-1.5 py-1 md:py-0.5 bg-[#3C3C3C] border border-[#0078D4] text-xs text-white focus:outline-none"
+                                  className={`w-full px-1.5 py-1 md:py-0.5 text-xs focus:outline-none border ${
+                                    isDark
+                                      ? 'bg-[#3C3C3C] border-[#0078D4] text-white'
+                                      : 'bg-white border-[#0078D4] text-[#1E1E1E]'
+                                  }`}
                                 />
                               </form>
                             )}
@@ -1775,8 +1834,12 @@ export default function App() {
                                     title={`${file.path} — ${file.navLabel} Page (${file.description})`}
                                     className={`group w-full min-h-[44px] md:min-h-0 flex items-center justify-between pl-3 pr-2 py-2 md:py-0.5 text-left cursor-pointer text-[13px] ${
                                       active
-                                        ? 'bg-[#04395E] text-white outline-1 -outline-offset-1 outline-[#0078D4]'
-                                        : 'hover:bg-[#2A2D2E] text-[#CCCCCC]'
+                                        ? isDark
+                                          ? 'bg-[#04395E] text-white outline-1 -outline-offset-1 outline-[#0078D4]'
+                                          : 'bg-[#E8E8E8] text-[#000000] font-medium outline-1 -outline-offset-1 outline-[#0078D4]'
+                                        : isDark
+                                        ? 'hover:bg-[#2A2D2E] text-[#CCCCCC]'
+                                        : 'hover:bg-[#E8E8E8] text-[#333333]'
                                     }`}
                                   >
                                     <span className="flex items-center gap-1.5 truncate min-w-0">
@@ -1788,7 +1851,11 @@ export default function App() {
                                       <span className="truncate">{file.name}</span>
                                       <span
                                         className={`text-[10px] truncate ml-1 ${
-                                          active ? 'text-[#A6D2FF]' : 'text-[#6E6E6E]'
+                                          active
+                                            ? isDark
+                                              ? 'text-[#A6D2FF]'
+                                              : 'text-[#0078D4] font-semibold'
+                                            : 'text-[#858585]'
                                         }`}
                                       >
                                         {file.navLabel}
@@ -1803,7 +1870,11 @@ export default function App() {
                                           setEditorMode('split');
                                         }}
                                         title="Open to the Side (Split Editor Right)"
-                                        className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-7 h-7 md:w-auto md:h-auto p-1 md:p-0.5 rounded hover:bg-[#3C3C3C] text-[#CCCCCC] hover:text-white flex items-center justify-center"
+                                        className={`opacity-100 md:opacity-0 md:group-hover:opacity-100 w-7 h-7 md:w-auto md:h-auto p-1 md:p-0.5 rounded flex items-center justify-center ${
+                                          isDark
+                                            ? 'hover:bg-[#3C3C3C] text-[#CCCCCC] hover:text-white'
+                                            : 'hover:bg-[#D4D4D4] text-[#616161] hover:text-[#1E1E1E]'
+                                        }`}
                                       >
                                         <Codicon
                                           name="split-horizontal"
@@ -1846,8 +1917,12 @@ export default function App() {
                                     }}
                                     className={`group w-full min-h-[44px] md:min-h-0 flex items-center justify-between pl-3 pr-2 py-2 md:py-0.5 text-left cursor-pointer text-[13px] ${
                                       active
-                                        ? 'bg-[#04395E] text-white outline-1 -outline-offset-1 outline-[#0078D4]'
-                                        : 'hover:bg-[#2A2D2E] text-[#CCCCCC]'
+                                        ? isDark
+                                          ? 'bg-[#04395E] text-white outline-1 -outline-offset-1 outline-[#0078D4]'
+                                          : 'bg-[#E8E8E8] text-[#000000] font-medium outline-1 -outline-offset-1 outline-[#0078D4]'
+                                        : isDark
+                                        ? 'hover:bg-[#2A2D2E] text-[#CCCCCC]'
+                                        : 'hover:bg-[#E8E8E8] text-[#333333]'
                                     }`}
                                   >
                                     <span className="flex items-center gap-1.5 truncate min-w-0">
@@ -1870,12 +1945,14 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => setProjectsFolderExpanded((prev) => !prev)}
-                          className="w-full min-h-[44px] md:min-h-0 flex items-center justify-between pl-2.5 pr-2 py-2 md:py-0.5 hover:bg-[#2A2D2E] text-left cursor-pointer text-[13px] text-[#CCCCCC]"
+                          className={`w-full min-h-[44px] md:min-h-0 flex items-center justify-between pl-2.5 pr-2 py-2 md:py-0.5 text-left cursor-pointer text-[13px] ${
+                            isDark ? 'hover:bg-[#2A2D2E] text-[#CCCCCC]' : 'hover:bg-[#E8E8E8] text-[#333333]'
+                          }`}
                         >
                           <span className="flex items-center gap-1.5 truncate">
                             <Codicon
                               name={projectsFolderExpanded ? 'chevron-down' : 'chevron-right'}
-                              className="!text-[14px] text-[#CCCCCC] shrink-0"
+                              className={`!text-[14px] shrink-0 ${isDark ? 'text-[#CCCCCC]' : 'text-[#616161]'}`}
                             />
                             <Codicon
                               name={projectsFolderExpanded ? 'folder-opened' : 'folder'}
@@ -1889,7 +1966,7 @@ export default function App() {
                         </button>
 
                         {projectsFolderExpanded && (
-                          <div className="ml-[17px] border-l border-[#2B2B2B]">
+                          <div className={`ml-[17px] border-l ${isDark ? 'border-[#2B2B2B]' : 'border-[#E0E0E0]'}`}>
                             {projects
                               .filter((proj) => {
                                 const q = explorerFilterQuery.toLowerCase().trim();
@@ -1915,8 +1992,12 @@ export default function App() {
                                     title={`Open ${proj.title} (${proj.category}) Case Study`}
                                     className={`group w-full min-h-[44px] md:min-h-0 flex items-center justify-between pl-3 pr-2 py-2 md:py-0.5 text-left cursor-pointer text-[13px] ${
                                       isProjActive
-                                        ? 'bg-[#04395E] text-white outline-1 -outline-offset-1 outline-[#0078D4]'
-                                        : 'hover:bg-[#2A2D2E] text-[#CCCCCC]'
+                                        ? isDark
+                                          ? 'bg-[#04395E] text-white outline-1 -outline-offset-1 outline-[#0078D4]'
+                                          : 'bg-[#E8E8E8] text-[#000000] font-medium outline-1 -outline-offset-1 outline-[#0078D4]'
+                                        : isDark
+                                        ? 'hover:bg-[#2A2D2E] text-[#CCCCCC]'
+                                        : 'hover:bg-[#E8E8E8] text-[#333333]'
                                     }`}
                                   >
                                     <span className="flex items-center gap-1.5 truncate min-w-0">
@@ -1936,11 +2017,13 @@ export default function App() {
                         {customFolders.map((folderName) => (
                           <div
                             key={folderName}
-                            className="w-full min-h-[44px] md:min-h-0 flex items-center gap-1.5 pl-2.5 pr-2 py-2 md:py-0.5 hover:bg-[#2A2D2E] text-left text-[13px] text-[#CCCCCC]"
+                            className={`w-full min-h-[44px] md:min-h-0 flex items-center gap-1.5 pl-2.5 pr-2 py-2 md:py-0.5 text-left text-[13px] ${
+                              isDark ? 'hover:bg-[#2A2D2E] text-[#CCCCCC]' : 'hover:bg-[#E8E8E8] text-[#333333]'
+                            }`}
                           >
                             <Codicon
                               name="chevron-right"
-                              className="!text-[14px] text-[#CCCCCC] shrink-0"
+                              className={`!text-[14px] shrink-0 ${isDark ? 'text-[#CCCCCC]' : 'text-[#616161]'}`}
                             />
                             <Codicon
                               name="folder"
@@ -1956,11 +2039,13 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => setConfigFolderExpanded((prev) => !prev)}
-                      className="w-full min-h-[44px] md:min-h-0 flex items-center gap-1.5 pl-3 pr-2 py-2 md:py-0.5 hover:bg-[#2A2D2E] text-left cursor-pointer text-[13px] text-[#CCCCCC]"
+                      className={`w-full min-h-[44px] md:min-h-0 flex items-center gap-1.5 pl-3 pr-2 py-2 md:py-0.5 text-left cursor-pointer text-[13px] ${
+                        isDark ? 'hover:bg-[#2A2D2E] text-[#CCCCCC]' : 'hover:bg-[#E8E8E8] text-[#333333]'
+                      }`}
                     >
                       <Codicon
                         name={configFolderExpanded ? 'chevron-down' : 'chevron-right'}
-                        className="!text-[14px] text-[#CCCCCC] shrink-0"
+                        className={`!text-[14px] shrink-0 ${isDark ? 'text-[#CCCCCC]' : 'text-[#616161]'}`}
                       />
                       <Codicon
                         name={configFolderExpanded ? 'folder-opened' : 'folder'}
@@ -1970,7 +2055,7 @@ export default function App() {
                     </button>
 
                     {configFolderExpanded && (
-                      <div className="ml-[19px] border-l border-[#2B2B2B]">
+                      <div className={`ml-[19px] border-l ${isDark ? 'border-[#2B2B2B]' : 'border-[#E0E0E0]'}`}>
                         {WORKSPACE_FILES.filter((f) => f.folder === 'config')
                           .filter((f) => {
                             const q = explorerFilterQuery.toLowerCase().trim();
@@ -1998,8 +2083,12 @@ export default function App() {
                                 }}
                                 className={`group w-full min-h-[44px] md:min-h-0 flex items-center justify-between pl-3 pr-2 py-2 md:py-0.5 text-left cursor-pointer text-[13px] ${
                                   active
-                                    ? 'bg-[#04395E] text-white outline-1 -outline-offset-1 outline-[#0078D4]'
-                                    : 'hover:bg-[#2A2D2E] text-[#CCCCCC]'
+                                    ? isDark
+                                      ? 'bg-[#04395E] text-white outline-1 -outline-offset-1 outline-[#0078D4]'
+                                      : 'bg-[#E8E8E8] text-[#000000] font-medium outline-1 -outline-offset-1 outline-[#0078D4]'
+                                    : isDark
+                                    ? 'hover:bg-[#2A2D2E] text-[#CCCCCC]'
+                                    : 'hover:bg-[#E8E8E8] text-[#333333]'
                                 }`}
                               >
                                 <span className="flex items-center gap-1.5 truncate">
@@ -2031,7 +2120,11 @@ export default function App() {
                                       setEditorMode('split');
                                     }}
                                     title="Open to the Side (Split Editor Right)"
-                                    className="opacity-100 md:opacity-0 md:group-hover:opacity-100 w-7 h-7 md:w-auto md:h-auto p-1 md:p-0.5 rounded hover:bg-[#3C3C3C] text-[#CCCCCC] hover:text-white flex items-center justify-center"
+                                    className={`opacity-100 md:opacity-0 md:group-hover:opacity-100 w-7 h-7 md:w-auto md:h-auto p-1 md:p-0.5 rounded flex items-center justify-center ${
+                                      isDark
+                                        ? 'hover:bg-[#3C3C3C] text-[#CCCCCC] hover:text-white'
+                                        : 'hover:bg-[#D4D4D4] text-[#616161] hover:text-[#1E1E1E]'
+                                    }`}
                                   >
                                     <Codicon name="split-horizontal" className="!text-[12px]" />
                                   </button>
@@ -2054,8 +2147,12 @@ export default function App() {
                           }}
                           className={`group w-full min-h-[44px] md:min-h-0 flex items-center justify-between pl-3 pr-2 py-2 md:py-0.5 text-left cursor-pointer text-[13px] ${
                             activeFile === 'settings'
-                              ? 'bg-[#04395E] text-white outline-1 -outline-offset-1 outline-[#0078D4]'
-                              : 'hover:bg-[#2A2D2E] text-[#CCCCCC]'
+                              ? isDark
+                                ? 'bg-[#04395E] text-white outline-1 -outline-offset-1 outline-[#0078D4]'
+                                : 'bg-[#E8E8E8] text-[#000000] font-medium outline-1 -outline-offset-1 outline-[#0078D4]'
+                              : isDark
+                              ? 'hover:bg-[#2A2D2E] text-[#CCCCCC]'
+                              : 'hover:bg-[#E8E8E8] text-[#333333]'
                           }`}
                         >
                           <span className="flex items-center gap-1.5 truncate">
@@ -2082,7 +2179,11 @@ export default function App() {
                       top: Math.min(explorerContextMenu.y, window.innerHeight - 190),
                       left: Math.min(explorerContextMenu.x, window.innerWidth - 220),
                     }}
-                    className="fixed w-56 rounded-md border border-[#454545] bg-[#252526] text-[#CCCCCC] shadow-[0_8px_24px_rgba(0,0,0,0.65)] py-1 z-50 text-xs"
+                    className={`fixed w-56 rounded-md border py-1 z-50 text-xs ${
+                      isDark
+                        ? 'border-[#454545] bg-[#252526] text-[#CCCCCC] shadow-[0_8px_24px_rgba(0,0,0,0.65)]'
+                        : 'border-[#CECECE] bg-white text-[#1E1E1E] shadow-[0_8px_24px_rgba(0,0,0,0.15)]'
+                    }`}
                   >
                     <button
                       type="button"
@@ -2090,7 +2191,9 @@ export default function App() {
                         handleOpenFile(explorerContextMenu.fileId);
                         setExplorerContextMenu(null);
                       }}
-                      className="w-full min-h-[44px] md:min-h-0 flex items-center justify-between px-3 py-2.5 md:py-1.5 hover:bg-[#04395E] hover:text-white text-left cursor-pointer"
+                      className={`w-full min-h-[44px] md:min-h-0 flex items-center justify-between px-3 py-2.5 md:py-1.5 text-left cursor-pointer ${
+                        isDark ? 'hover:bg-[#04395E] hover:text-white' : 'hover:bg-[#0078D4] hover:text-white'
+                      }`}
                     >
                       <span>Open Page / Editor</span>
                       <span className="font-mono text-[10px] text-[#858585]">Enter</span>
@@ -2102,12 +2205,14 @@ export default function App() {
                         setEditorMode('split');
                         setExplorerContextMenu(null);
                       }}
-                      className="w-full min-h-[44px] md:min-h-0 flex items-center justify-between px-3 py-2.5 md:py-1.5 hover:bg-[#04395E] hover:text-white text-left cursor-pointer"
+                      className={`w-full min-h-[44px] md:min-h-0 flex items-center justify-between px-3 py-2.5 md:py-1.5 text-left cursor-pointer ${
+                        isDark ? 'hover:bg-[#04395E] hover:text-white' : 'hover:bg-[#0078D4] hover:text-white'
+                      }`}
                     >
                       <span>Open to the Side</span>
                       <span className="font-mono text-[10px] text-[#858585]">Ctrl+Enter</span>
                     </button>
-                    <div className="my-1 border-t border-[#3C3C3C]" />
+                    <div className={`my-1 border-t ${isDark ? 'border-[#3C3C3C]' : 'border-[#E5E5E5]'}`} />
                     <button
                       type="button"
                       onClick={() => {
@@ -2116,7 +2221,9 @@ export default function App() {
                         );
                         setExplorerContextMenu(null);
                       }}
-                      className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#04395E] hover:text-white text-left cursor-pointer"
+                      className={`w-full flex items-center justify-between px-3 py-1.5 text-left cursor-pointer ${
+                        isDark ? 'hover:bg-[#04395E] hover:text-white' : 'hover:bg-[#0078D4] hover:text-white'
+                      }`}
                     >
                       <span>Copy Path</span>
                       <span className="font-mono text-[10px] text-[#858585]">Shift+Alt+C</span>
@@ -2127,13 +2234,15 @@ export default function App() {
                         navigator.clipboard?.writeText(explorerContextMenu.filePath);
                         setExplorerContextMenu(null);
                       }}
-                      className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-[#04395E] hover:text-white text-left cursor-pointer"
+                      className={`w-full flex items-center justify-between px-3 py-1.5 text-left cursor-pointer ${
+                        isDark ? 'hover:bg-[#04395E] hover:text-white' : 'hover:bg-[#0078D4] hover:text-white'
+                      }`}
                     >
                       <span>Copy Relative Path</span>
                     </button>
                     {explorerContextMenu.isCustom && (
                       <>
-                        <div className="my-1 border-t border-[#3C3C3C]" />
+                        <div className={`my-1 border-t ${isDark ? 'border-[#3C3C3C]' : 'border-[#E5E5E5]'}`} />
                         <button
                           type="button"
                           onClick={() => {
@@ -2163,13 +2272,17 @@ export default function App() {
           {/* VIEW 2: GLOBAL WORKSPACE SEARCH */}
           {activityView === 'search' && (
             <div className="flex-1 flex flex-col p-2.5 space-y-2.5 overflow-y-auto text-xs">
-              <div className="flex items-center bg-[#3C3C3C] border border-[#0078D4] rounded-xs px-1.5 py-1">
+              <div className={`flex items-center rounded-xs px-1.5 py-1 border ${
+                isDark ? 'bg-[#3C3C3C] border-[#0078D4]' : 'bg-white border-[#CECECE] focus-within:border-[#0078D4]'
+              }`}>
                 <input
                   type="text"
                   value={globalSearchQuery}
                   onChange={(e) => setGlobalSearchQuery(e.target.value)}
                   placeholder="Search portfolio files..."
-                  className="flex-1 bg-transparent text-xs text-white placeholder-[#A0A0A0] focus:outline-none"
+                  className={`flex-1 bg-transparent text-xs focus:outline-none ${
+                    isDark ? 'text-white placeholder-[#A0A0A0]' : 'text-[#1E1E1E] placeholder-[#767676]'
+                  }`}
                 />
                 <div className="flex items-center gap-0.5 shrink-0 font-mono text-[11px]">
                   <button
@@ -2231,13 +2344,19 @@ export default function App() {
                       key={res.id}
                       type="button"
                       onClick={() => handleOpenFile(res.fileId)}
-                      className="w-full text-left p-2 rounded hover:bg-[#2A2D2E] space-y-1 cursor-pointer"
+                      className={`w-full text-left p-2 rounded space-y-1 cursor-pointer ${
+                        isDark ? 'hover:bg-[#2A2D2E]' : 'hover:bg-[#E8E8E8]'
+                      }`}
                     >
-                      <div className="flex items-center justify-between text-[12px] font-medium text-white">
+                      <div className={`flex items-center justify-between text-[12px] font-medium ${
+                        isDark ? 'text-white' : 'text-[#1E1E1E]'
+                      }`}>
                         <span className="truncate">{res.fileName}</span>
                         <span className="text-[10px] font-mono text-[#858585]">:{res.line}</span>
                       </div>
-                      <div className="text-[11px] font-mono text-[#CCCCCC] line-clamp-2 pl-2 border-l border-[#0078D4]">
+                      <div className={`text-[11px] font-mono line-clamp-2 pl-2 border-l border-[#0078D4] ${
+                        isDark ? 'text-[#CCCCCC]' : 'text-[#444444]'
+                      }`}>
                         {res.snippet}
                       </div>
                     </button>
@@ -2250,19 +2369,25 @@ export default function App() {
           {/* VIEW 3: EXTENSIONS (OFFICIAL DEVICON MULTI-COLOR SVGS + MARKETPLACE SEARCH) */}
           {activityView === 'extensions' && (
             <div className="flex-1 flex flex-col overflow-hidden p-2 space-y-2 text-xs">
-              <div className="flex items-center bg-[#3C3C3C] border border-[#0078D4] rounded-xs px-2 py-1">
+              <div className={`flex items-center rounded-xs px-2 py-1 border ${
+                isDark ? 'bg-[#3C3C3C] border-[#0078D4]' : 'bg-white border-[#CECECE] focus-within:border-[#0078D4]'
+              }`}>
                 <input
                   type="text"
                   value={extensionSearchQuery}
                   onChange={(e) => setExtensionSearchQuery(e.target.value)}
                   placeholder="Search Extensions in Marketplace"
-                  className="flex-1 bg-transparent text-xs text-white placeholder-[#A0A0A0] focus:outline-none"
+                  className={`flex-1 bg-transparent text-xs focus:outline-none ${
+                    isDark ? 'text-white placeholder-[#A0A0A0]' : 'text-[#1E1E1E] placeholder-[#767676]'
+                  }`}
                 />
-                <Codicon name="filter" className="!text-[13px] text-[#CCCCCC]" />
+                <Codicon name="filter" className={`!text-[13px] ${isDark ? 'text-[#CCCCCC]' : 'text-[#616161]'}`} />
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-1">
-                <div className="px-1 py-1 text-[11px] font-bold uppercase text-[#BBBBBB]">
+                <div className={`px-1 py-1 text-[11px] font-bold uppercase ${
+                  isDark ? 'text-[#BBBBBB]' : 'text-[#555555]'
+                }`}>
                   INSTALLED ({filteredExtensions.length})
                 </div>
                 {filteredExtensions.map((skill) => {
@@ -2273,21 +2398,31 @@ export default function App() {
                       type="button"
                       onClick={() => handleOpenFile(`extension:${skill.id}`)}
                       className={`w-full text-left p-2 rounded flex items-start gap-2.5 cursor-pointer ${
-                        isActiveExt ? 'bg-[#04395E] text-white' : 'hover:bg-[#2A2D2E]'
+                        isActiveExt
+                          ? isDark
+                            ? 'bg-[#04395E] text-white'
+                            : 'bg-[#E8E8E8] text-[#000000] font-medium outline-1 -outline-offset-1 outline-[#0078D4]'
+                          : isDark
+                          ? 'hover:bg-[#2A2D2E]'
+                          : 'hover:bg-[#F3F4F6]'
                       }`}
                     >
-                      <div className="p-1.5 rounded bg-[#252526] border border-[#2B2B2B] shrink-0 mt-0.5 flex items-center justify-center">
+                      <div className={`p-1.5 rounded shrink-0 mt-0.5 flex items-center justify-center border ${
+                        isDark ? 'bg-[#252526] border-[#2B2B2B]' : 'bg-white border-[#E0E0E0] shadow-xs'
+                      }`}>
                         <OfficialSkillIcon skillId={skill.id} className="w-6 h-6" theme={theme} />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
-                          <span className="font-semibold text-white truncate">{skill.name}</span>
+                          <span className={`font-semibold truncate ${
+                            isDark ? 'text-white' : 'text-[#1E1E1E]'
+                          }`}>{skill.name}</span>
                           <span className="text-[10px] font-mono text-[#858585]">
                             {skill.version}
                           </span>
                         </div>
                         <div className="text-[11px] text-[#858585] truncate">{skill.desc}</div>
-                        <div className="flex items-center justify-between gap-1 text-[10px] text-[#4FC1FF] mt-0.5">
+                        <div className="flex items-center justify-between gap-1 text-[10px] text-[#0078D4] mt-0.5">
                           <span className="inline-flex items-center gap-1 truncate">
                             <Codicon
                               name="verified-filled"
@@ -2303,11 +2438,6 @@ export default function App() {
                 })}
               </div>
             </div>
-          )}
-
-          {/* VIEW 4: GEMINI AI CHAT INTERFACE */}
-          {activityView === 'gemini' && (
-            <GeminiChatPanel onOpenFile={handleOpenFile} theme={theme} />
           )}
         </aside>
 
@@ -2353,9 +2483,11 @@ export default function App() {
                         type="button"
                         onClick={(e) => handleCloseTab(e, tabId)}
                         aria-label={`Close ${tabFile.name}`}
-                        className={`ml-0.5 md:ml-1 -mr-1.5 md:mr-0 min-w-[32px] min-h-[32px] md:min-w-0 md:min-h-0 p-1.5 md:p-0.5 rounded hover:bg-[#2A2D2E] flex items-center justify-center ${
-                          active ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'
-                        }`}
+                        className={`ml-0.5 md:ml-1 -mr-1.5 md:mr-0 min-w-[32px] min-h-[32px] md:min-w-0 md:min-h-0 p-1.5 md:p-0.5 rounded flex items-center justify-center ${
+                          isDark
+                            ? 'hover:bg-[#2A2D2E] text-[#CCCCCC] hover:text-white'
+                            : 'hover:bg-[#E0E0E0] text-[#616161] hover:text-[#1E1E1E]'
+                        } ${active ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}
                       >
                         <Codicon name="close" className="!text-[13px]" />
                       </button>
@@ -2367,7 +2499,9 @@ export default function App() {
 
             {/* Official VS Code Editor Actions Toolbar on the Right of Tab Bar */}
             <div className="flex items-center gap-1 px-1.5 md:px-2 shrink-0">
-              <div className="flex items-center rounded bg-[#252526] p-0.5 border border-[#2B2B2B]">
+              <div className={`flex items-center rounded p-0.5 border ${
+                isDark ? 'bg-[#252526] border-[#2B2B2B]' : 'bg-[#EAEAEA] border-[#D4D4D4]'
+              }`}>
                 <button
                   type="button"
                   onClick={() => setEditorMode('hybrid')}
@@ -2375,7 +2509,9 @@ export default function App() {
                   className={`min-h-[32px] md:min-h-0 px-2.5 py-1 rounded-xs text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors ${
                     editorMode === 'hybrid'
                       ? 'bg-[#0078D4] text-white'
-                      : 'text-[#868686] hover:text-white'
+                      : isDark
+                      ? 'text-[#868686] hover:text-white'
+                      : 'text-[#616161] hover:text-[#1E1E1E]'
                   }`}
                 >
                   <Codicon name="open-preview" className="!text-[13px]" />
@@ -2389,7 +2525,9 @@ export default function App() {
                   className={`min-h-[32px] md:min-h-0 px-2.5 py-1 rounded-xs text-[11px] font-medium flex items-center gap-1 cursor-pointer transition-colors ${
                     editorMode === 'code'
                       ? 'bg-[#0078D4] text-white'
-                      : 'text-[#868686] hover:text-white'
+                      : isDark
+                      ? 'text-[#868686] hover:text-white'
+                      : 'text-[#616161] hover:text-[#1E1E1E]'
                   }`}
                 >
                   <Codicon name="code" className="!text-[13px]" />
@@ -2404,7 +2542,9 @@ export default function App() {
                 className={`min-w-[40px] min-h-[40px] md:min-w-0 md:min-h-0 p-2 md:p-1.5 rounded flex items-center justify-center cursor-pointer ${
                   editorMode === 'split'
                     ? 'bg-[#0078D4] text-white'
-                    : 'text-[#868686] hover:bg-[#2A2D2E] hover:text-white'
+                    : isDark
+                    ? 'text-[#868686] hover:bg-[#2A2D2E] hover:text-white'
+                    : 'text-[#616161] hover:bg-[#E8E8E8] hover:text-[#1E1E1E]'
                 }`}
               >
                 <Codicon name="split-horizontal" className="!text-[15px]" />
@@ -2415,19 +2555,23 @@ export default function App() {
           {/* Clean VS Code 22px Path Breadcrumbs Bar */}
           {settings.breadcrumbsEnabled && (
             <div
-              className={`h-[22px] px-2 sm:px-4 flex items-center justify-between border-b ${borderCol} ${editorBg} text-[11px] sm:text-[12px] font-sans text-[#868686] shrink-0`}
+              className={`h-[22px] px-2 sm:px-4 flex items-center justify-between border-b ${borderCol} ${editorBg} text-[11px] sm:text-[12px] font-sans ${
+                isDark ? 'text-[#868686]' : 'text-[#616161]'
+              } shrink-0`}
             >
               <div className="flex items-center gap-1 overflow-x-auto overflow-y-hidden no-scrollbar whitespace-nowrap min-w-0">
                 <span className="hidden sm:inline px-1 shrink-0">mustafa-dev-portfolio</span>
                 <Codicon
                   name="chevron-right"
-                  className="hidden sm:inline !text-[13px] text-[#868686] shrink-0"
+                  className={`hidden sm:inline !text-[13px] shrink-0 ${isDark ? 'text-[#868686]' : 'text-[#767676]'}`}
                 />
                 <span className="px-1 shrink-0">
                   {currentFileMeta.folder.replace('/', ' › ')}
                 </span>
-                <Codicon name="chevron-right" className="!text-[13px] text-[#868686] shrink-0" />
-                <span className="inline-flex items-center gap-1.5 text-[#CCCCCC] px-1 shrink-0">
+                <Codicon name="chevron-right" className={`!text-[13px] shrink-0 ${isDark ? 'text-[#868686]' : 'text-[#767676]'}`} />
+                <span className={`inline-flex items-center gap-1.5 px-1 shrink-0 ${
+                  isDark ? 'text-[#CCCCCC]' : 'text-[#1E1E1E] font-medium'
+                }`}>
                   <SetiFileIcon
                     fileId={currentFileMeta.id}
                     extension={currentFileMeta.extension}
@@ -2441,22 +2585,32 @@ export default function App() {
 
           {/* OFFICIAL FLOATING TOP-RIGHT EDITOR FIND WIDGET (Ctrl+F) */}
           {findWidgetOpen && (
-            <div className="absolute right-2 sm:right-8 top-[60px] z-30 flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xs bg-[#252526] border border-[#454545] shadow-xl text-xs max-w-[calc(100vw-3.5rem)]">
-              <div className="flex items-center bg-[#3C3C3C] border border-[#0078D4] rounded-xs px-2 py-0.5">
+            <div className={`absolute right-2 sm:right-8 top-[60px] z-30 flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xs border shadow-xl text-xs max-w-[calc(100vw-3.5rem)] ${
+              isDark ? 'bg-[#252526] border-[#454545]' : 'bg-white border-[#CECECE] shadow-[0_4px_16px_rgba(0,0,0,0.12)]'
+            }`}>
+              <div className={`flex items-center rounded-xs px-2 py-0.5 border ${
+                isDark ? 'bg-[#3C3C3C] border-[#0078D4]' : 'bg-white border-[#0078D4]'
+              }`}>
                 <input
                   type="text"
                   autoFocus
                   value={findQuery}
                   onChange={(e) => setFindQuery(e.target.value)}
                   placeholder="Find"
-                  className="w-40 bg-transparent text-xs text-white focus:outline-none"
+                  className={`w-40 bg-transparent text-xs focus:outline-none ${
+                    isDark ? 'text-white' : 'text-[#1E1E1E]'
+                  }`}
                 />
                 <button
                   type="button"
                   onClick={() => setFindMatchCase((p) => !p)}
                   title="Match Case"
                   className={`px-1 rounded text-[11px] font-mono cursor-pointer ${
-                    findMatchCase ? 'bg-[#0078D4] text-white' : 'text-[#CCCCCC]'
+                    findMatchCase
+                      ? 'bg-[#0078D4] text-white'
+                      : isDark
+                      ? 'text-[#CCCCCC]'
+                      : 'text-[#616161]'
                   }`}
                 >
                   Aa
@@ -2466,7 +2620,11 @@ export default function App() {
                   onClick={() => setFindWholeWord((p) => !p)}
                   title="Match Whole Word"
                   className={`px-1 rounded text-[11px] font-mono cursor-pointer ${
-                    findWholeWord ? 'bg-[#0078D4] text-white' : 'text-[#CCCCCC]'
+                    findWholeWord
+                      ? 'bg-[#0078D4] text-white'
+                      : isDark
+                      ? 'text-[#CCCCCC]'
+                      : 'text-[#616161]'
                   }`}
                 >
                   ab
@@ -2481,7 +2639,9 @@ export default function App() {
                   setCursorPos((p) => ({ line: Math.max(1, p.line - 2), col: 1 }))
                 }
                 title="Previous Match (Shift+Enter)"
-                className="p-1 rounded hover:bg-[#2A2D2E] text-[#CCCCCC] cursor-pointer"
+                className={`p-1 rounded cursor-pointer ${
+                  isDark ? 'hover:bg-[#2A2D2E] text-[#CCCCCC]' : 'hover:bg-[#E8E8E8] text-[#333333]'
+                }`}
               >
                 <Codicon name="arrow-up" className="!text-[13px]" />
               </button>
@@ -2491,7 +2651,9 @@ export default function App() {
                   setCursorPos((p) => ({ line: Math.min(42, p.line + 2), col: 1 }))
                 }
                 title="Next Match (Enter)"
-                className="p-1 rounded hover:bg-[#2A2D2E] text-[#CCCCCC] cursor-pointer"
+                className={`p-1 rounded cursor-pointer ${
+                  isDark ? 'hover:bg-[#2A2D2E] text-[#CCCCCC]' : 'hover:bg-[#E8E8E8] text-[#333333]'
+                }`}
               >
                 <Codicon name="arrow-down" className="!text-[13px]" />
               </button>
@@ -2499,7 +2661,9 @@ export default function App() {
                 type="button"
                 onClick={() => setFindWidgetOpen(false)}
                 title="Close (Escape)"
-                className="p-1 rounded hover:bg-[#2A2D2E] text-[#CCCCCC] cursor-pointer"
+                className={`p-1 rounded cursor-pointer ${
+                  isDark ? 'hover:bg-[#2A2D2E] text-[#CCCCCC]' : 'hover:bg-[#E8E8E8] text-[#333333]'
+                }`}
               >
                 <Codicon name="close" className="!text-[13px]" />
               </button>
@@ -2709,18 +2873,24 @@ export default function App() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-md border border-[#454545] bg-[#252526] text-[#CCCCCC] shadow-2xl p-6 space-y-4 text-xs"
+            className={`w-full max-w-md rounded-md border shadow-2xl p-6 space-y-4 text-xs ${
+              isDark
+                ? 'border-[#454545] bg-[#252526] text-[#CCCCCC]'
+                : 'border-[#CECECE] bg-white text-[#1E1E1E]'
+            }`}
           >
             <div className="flex items-center gap-3">
               <OfficialVSCodeLogo className="w-10 h-10 shrink-0" />
               <div>
-                <h2 className="text-base font-bold text-white">
+                <h2 className={`text-base font-bold ${isDark ? 'text-white' : 'text-[#1E1E1E]'}`}>
                   Visual Studio Code — MUSTAFA.dev
                 </h2>
                 <p className="text-[#858585]">Developer Portfolio Workbench Edition</p>
               </div>
             </div>
-            <div className="space-y-1 font-mono text-[11px] bg-[#181818] p-3 rounded border border-[#2B2B2B]">
+            <div className={`space-y-1 font-mono text-[11px] p-3 rounded border ${
+              isDark ? 'bg-[#181818] border-[#2B2B2B] text-[#CCCCCC]' : 'bg-[#F8F9FA] border-[#E5E5E5] text-[#1E1E1E]'
+            }`}>
               <div>Developer: {DEVELOPER_PROFILE.name}</div>
               <div>Role: {DEVELOPER_PROFILE.title} ({DEVELOPER_PROFILE.roleSubtitle})</div>
               <div>Stack: React 19 · Tailwind CSS v4 · Firebase Firestore</div>
@@ -2734,7 +2904,11 @@ export default function App() {
                   );
                   setAboutModalOpen(false);
                 }}
-                className="px-3 py-1 rounded bg-[#313131] hover:bg-[#3C3C3C] text-white cursor-pointer"
+                className={`px-3 py-1 rounded cursor-pointer ${
+                  isDark
+                    ? 'bg-[#313131] hover:bg-[#3C3C3C] text-white'
+                    : 'bg-[#EAEAEA] hover:bg-[#DCDCDC] text-[#1E1E1E]'
+                }`}
               >
                 Copy
               </button>
@@ -2777,7 +2951,9 @@ export default function App() {
                 ? 'Open Verified Owner Inbox (config/messages-inbox.json)'
                 : 'Owner Inbox (Restricted — Sign in as Owner to view)'
             }
-            className="h-full flex items-center gap-1 hover:bg-[#2A2D2E] px-2 cursor-pointer tabular-nums shrink-0"
+            className={`h-full flex items-center gap-1 px-2 cursor-pointer tabular-nums shrink-0 ${
+              isDark ? 'hover:bg-[#2A2D2E]' : 'hover:bg-[#E8E8E8]'
+            }`}
           >
             <Codicon
               name={isOwner ? 'mail' : 'lock'}
@@ -2793,7 +2969,7 @@ export default function App() {
             UTF-8
           </span>
 
-          <span className="hidden sm:flex items-center h-full px-2 text-[#CCCCCC]">
+          <span className={`hidden sm:flex items-center h-full px-2 ${isDark ? 'text-[#CCCCCC]' : 'text-[#333333]'}`}>
             {currentFileMeta.language}
           </span>
 
@@ -2801,36 +2977,12 @@ export default function App() {
             type="button"
             onClick={() => setTerminalOpen((prev) => !prev)}
             title="Toggle Interactive Terminal (Ctrl+`)"
-            className="h-full flex items-center gap-1 hover:bg-[#2A2D2E] px-2 cursor-pointer"
+            className={`h-full flex items-center gap-1 px-2 cursor-pointer ${
+              isDark ? 'hover:bg-[#2A2D2E]' : 'hover:bg-[#E8E8E8]'
+            }`}
           >
             <Codicon name="terminal" className="!text-[12px]" />
             <span>Terminal</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleToggleTheme()}
-            title="Switch Dark / Light Theme (Alt+T)"
-            className="h-full flex items-center gap-1 hover:bg-[#2A2D2E] px-2 cursor-pointer"
-          >
-            <Codicon name="color-mode" className="!text-[12px]" />
-            <span className="hidden xs:inline">{isDark ? 'Dark Modern' : 'Light Modern'}</span>
-          </button>
-
-          {/* OS Platform Switcher in Status Bar */}
-          <button
-            type="button"
-            onClick={() => setOSModalOpen(true)}
-            title={`Active OS: ${OS_META[activeOS].name} (${isAutoOS ? 'Auto' : 'Manual'}). Click to change`}
-            className="h-full flex items-center gap-1 hover:bg-[#2A2D2E] px-2 cursor-pointer font-mono text-[10px] text-[#4FC1FF]"
-          >
-            <span>
-              {activeOS === 'macos' && '🍎 Mac'}
-              {activeOS === 'windows' && '🪟 Win'}
-              {activeOS === 'linux' && '🐧 Linux'}
-              {activeOS === 'android' && '🤖 Android'}
-              {activeOS === 'ios' && '📱 iOS'}
-            </span>
           </button>
         </div>
       </footer>
@@ -2843,8 +2995,6 @@ export default function App() {
         onSelectActivity={(view) => handleActivityClick(view)}
         onToggleTerminal={() => setTerminalOpen((prev) => !prev)}
         onOpenResume={() => window.open(DEVELOPER_PROFILE.resumeUrl, '_blank')}
-        currentOS={activeOS}
-        onOpenOSSwitcher={() => setOSModalOpen(true)}
         theme={theme}
         unreadCount={isOwner ? messages.filter((m) => !m.read).length : 0}
       />

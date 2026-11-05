@@ -466,3 +466,187 @@ export const OfficialGeminiLogo: React.FC<{ className?: string }> = ({
     </svg>
   );
 };
+
+/**
+ * 6. Official Desktop Window Control Icons (Windows 11 Fluent, macOS, Linux GNOME)
+ * Replaces raw unicode text symbols (+, -, x) with pixel-crisp SVG vector icons.
+ */
+export const WindowMinimizeIcon: React.FC<{ className?: string }> = ({
+  className = 'w-2.5 h-2.5',
+}) => (
+  <svg
+    viewBox="0 0 10 10"
+    className={`shrink-0 ${className}`}
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <path d="M0.5 5H9.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+  </svg>
+);
+
+export const WindowMaximizeIcon: React.FC<{ className?: string }> = ({
+  className = 'w-2.5 h-2.5',
+}) => (
+  <svg
+    viewBox="0 0 10 10"
+    className={`shrink-0 ${className}`}
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <rect x="0.75" y="0.75" width="8.5" height="8.5" stroke="currentColor" strokeWidth="1.1" rx="0.5" />
+  </svg>
+);
+
+export const WindowRestoreIcon: React.FC<{ className?: string }> = ({
+  className = 'w-2.5 h-2.5',
+}) => (
+  <svg
+    viewBox="0 0 10 10"
+    className={`shrink-0 ${className}`}
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <path
+      d="M2.5 0.75H9.25V7.5"
+      stroke="currentColor"
+      strokeWidth="1.1"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <rect
+      x="0.75"
+      y="2.5"
+      width="6.75"
+      height="6.75"
+      stroke="currentColor"
+      strokeWidth="1.1"
+      rx="0.5"
+      fill="currentColor"
+      fillOpacity="0.1"
+    />
+  </svg>
+);
+
+export const WindowCloseIcon: React.FC<{ className?: string }> = ({
+  className = 'w-2.5 h-2.5',
+}) => (
+  <svg
+    viewBox="0 0 10 10"
+    className={`shrink-0 ${className}`}
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <path
+      d="M1 1L9 9M9 1L1 9"
+      stroke="currentColor"
+      strokeWidth="1.2"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+export const MacCloseIcon: React.FC<{ className?: string }> = ({
+  className = 'w-2 h-2',
+}) => (
+  <svg
+    viewBox="0 0 8 8"
+    className={`shrink-0 ${className}`}
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <path
+      d="M1.5 1.5L6.5 6.5M6.5 1.5L1.5 6.5"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+export const MacMinimizeIcon: React.FC<{ className?: string }> = ({
+  className = 'w-2 h-2',
+}) => (
+  <svg
+    viewBox="0 0 8 8"
+    className={`shrink-0 ${className}`}
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <path d="M1 4H7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+  </svg>
+);
+
+export const MacMaximizeIcon: React.FC<{ className?: string }> = ({
+  className = 'w-2 h-2',
+}) => (
+  <svg
+    viewBox="0 0 8 8"
+    className={`shrink-0 ${className}`}
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <path d="M4 1V7M1 4H7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+  </svg>
+);
+
+export const GnomeMinimizeIcon: React.FC<{ className?: string }> = ({
+  className = 'w-2 h-2',
+}) => (
+  <svg
+    viewBox="0 0 10 10"
+    className={`shrink-0 ${className}`}
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <path d="M1.5 5H8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+  </svg>
+);
+
+export const GnomeMaximizeIcon: React.FC<{ className?: string }> = ({
+  className = 'w-2 h-2',
+}) => (
+  <svg
+    viewBox="0 0 10 10"
+    className={`shrink-0 ${className}`}
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <rect
+      x="1.5"
+      y="1.5"
+      width="7"
+      height="7"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      rx="0.5"
+    />
+  </svg>
+);
+
+export const GnomeCloseIcon: React.FC<{ className?: string }> = ({
+  className = 'w-2 h-2',
+}) => (
+  <svg
+    viewBox="0 0 10 10"
+    className={`shrink-0 ${className}`}
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <path
+      d="M2 2L8 8M8 2L2 8"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+    />
+  </svg>
+);

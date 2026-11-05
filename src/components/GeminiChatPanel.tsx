@@ -341,9 +341,13 @@ export const GeminiChatPanel: React.FC<GeminiChatPanelProps> = ({
                   <button
                     type="button"
                     onClick={() => toggleThoughts(msg.id)}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#252526] hover:bg-[#2F2F2F] border border-[#3C3C3C] text-[11px] font-mono text-[#4FC1FF] transition-colors cursor-pointer"
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded border text-[11px] font-mono transition-colors cursor-pointer ${
+                      isDark
+                        ? 'bg-[#252526] hover:bg-[#2F2F2F] border-[#3C3C3C] text-[#4FC1FF]'
+                        : 'bg-white hover:bg-[#F3F4F6] border-[#D4D4D4] text-[#0066B8] shadow-2xs'
+                    }`}
                   >
-                    <OfficialGeminiLogo className="w-3 h-3 text-[#4FC1FF]" />
+                    <OfficialGeminiLogo className="w-3 h-3 text-[#0078D4]" />
                     <span>Thought Process ({msg.thoughts!.length} steps)</span>
                     <Codicon
                       name={isThoughtExpanded ? 'chevron-up' : 'chevron-down'}
@@ -352,14 +356,18 @@ export const GeminiChatPanel: React.FC<GeminiChatPanelProps> = ({
                   </button>
 
                   {isThoughtExpanded && (
-                    <div className="mt-1.5 p-2.5 rounded bg-[#1A1A1A] border border-[#2B2B2B] text-[11px] font-mono space-y-1 text-[#A0A0A0]">
-                      <div className="text-[10px] uppercase tracking-wider text-[#4EC9B0] font-semibold flex items-center gap-1 mb-1">
+                    <div className={`mt-1.5 p-2.5 rounded border text-[11px] font-mono space-y-1 ${
+                      isDark
+                        ? 'bg-[#1A1A1A] border-[#2B2B2B] text-[#A0A0A0]'
+                        : 'bg-[#F9F9F9] border-[#E5E5E5] text-[#424242]'
+                    }`}>
+                      <div className="text-[10px] uppercase tracking-wider text-[#0078D4] font-semibold flex items-center gap-1 mb-1">
                         <Codicon name="sparkle" className="!text-[11px]" />
                         <span>Reasoning Trace</span>
                       </div>
                       {msg.thoughts!.map((thought, tIdx) => (
                         <div key={tIdx} className="flex items-start gap-1.5 pl-1 leading-relaxed">
-                          <span className="text-[#569CD6]">›</span>
+                          <span className="text-[#0078D4]">›</span>
                           <span>{thought}</span>
                         </div>
                       ))}
@@ -420,10 +428,14 @@ export const GeminiChatPanel: React.FC<GeminiChatPanelProps> = ({
 
         {/* Gemini Active Thinking Card (official pulsing state while generating) */}
         {isLoading && (
-          <div className="w-full max-w-[94%] p-3 rounded-md bg-[#252526] border border-[#3C3C3C] space-y-2">
-            <div className="flex items-center gap-2 text-xs font-mono text-[#CCCCCC]">
-              <OfficialGeminiLogo className="w-4 h-4 animate-spin" />
-              <span className="font-semibold text-white">Gemini is thinking...</span>
+          <div className={`w-full max-w-[94%] p-3 rounded-md border space-y-2 ${
+            isDark ? 'bg-[#252526] border-[#3C3C3C]' : 'bg-white border-[#E0E0E0] shadow-sm'
+          }`}>
+            <div className={`flex items-center gap-2 text-xs font-mono ${
+              isDark ? 'text-[#CCCCCC]' : 'text-[#333333]'
+            }`}>
+              <OfficialGeminiLogo className="w-4 h-4 animate-spin text-[#0078D4]" />
+              <span className={`font-semibold ${isDark ? 'text-white' : 'text-[#1F1F1F]'}`}>Gemini is thinking...</span>
             </div>
             <div className="space-y-1 pl-6 text-[11px] font-mono text-[#858585]">
               <p className="flex items-center gap-1.5 animate-pulse">

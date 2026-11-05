@@ -913,7 +913,11 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
             </div>
 
             <div
-              className={`p-4 rounded bg-[#181818] border ${borderClass} text-xs font-mono text-[#CE9178]`}
+              className={`p-4 rounded border text-xs font-mono ${
+                isDark
+                  ? 'bg-[#181818] border-[#2B2B2B] text-[#CE9178]'
+                  : 'bg-[#FFF8F0] border-[#F0D0B0] text-[#B83800]'
+              }`}
             >
               &ldquo;{DEVELOPER_PROFILE.quote}&rdquo;
             </div>
@@ -990,7 +994,9 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
                 className={`rounded-md border ${cardSurface} hover:border-[#0078D4] overflow-hidden flex flex-col justify-between transition-colors cursor-pointer group`}
               >
                 <div>
-                  <div className="relative w-full aspect-video bg-[#141414] overflow-hidden border-b border-[#2B2B2B]">
+                  <div className={`relative w-full aspect-video overflow-hidden border-b ${
+                    isDark ? 'bg-[#141414] border-[#2B2B2B]' : 'bg-slate-100 border-slate-200'
+                  }`}>
                     {!imgFailed ? (
                       <img
                         src={proj.image}
@@ -1002,9 +1008,11 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center bg-[#141414] p-6 text-center">
+                      <div className={`w-full h-full flex flex-col items-center justify-center p-6 text-center ${
+                        isDark ? 'bg-[#141414]' : 'bg-slate-100'
+                      }`}>
                         <Codicon name="code" className="!text-[28px] text-[#0078D4] mb-2" />
-                        <span className="text-sm font-bold text-white">{proj.title}</span>
+                        <span className={`text-sm font-bold ${isDark ? 'text-white' : 'text-[#1E1E1E]'}`}>{proj.title}</span>
                       </div>
                     )}
                   </div>
@@ -1029,7 +1037,9 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
                       <p className="text-xs leading-relaxed">{proj.description}</p>
                     </div>
 
-                    <div className="text-[11px] font-mono text-[#CE9178] pt-1">
+                    <div className={`text-[11px] font-mono pt-1 ${
+                      isDark ? 'text-[#CE9178]' : 'text-[#A31515]'
+                    }`}>
                       {proj.tags.join(' · ')}
                     </div>
                   </div>
@@ -1118,7 +1128,9 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
       })),
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-1 p-1 rounded bg-[#181818] border border-[#2B2B2B]">
+          <div className={`flex flex-wrap items-center gap-1 p-1 rounded border ${
+            isDark ? 'bg-[#181818] border-[#2B2B2B]' : 'bg-[#EAEAEA] border-[#D4D4D4]'
+          }`}>
             {categories.map((cat) => (
               <button
                 key={cat}
@@ -1127,7 +1139,9 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
                 className={`px-3 py-1 text-xs font-mono rounded transition-colors cursor-pointer ${
                   skillCategory === cat
                     ? 'bg-[#0078D4] text-white font-semibold'
-                    : 'text-[#858585] hover:text-white'
+                    : isDark
+                    ? 'text-[#858585] hover:text-white'
+                    : 'text-[#616161] hover:text-[#1E1E1E]'
                 }`}
               >
                 {cat}
@@ -1160,7 +1174,9 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
               <div className="space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-md bg-[#181818] border border-[#2B2B2B] flex items-center justify-center shrink-0">
+                    <div className={`w-11 h-11 rounded-md border flex items-center justify-center shrink-0 ${
+                      isDark ? 'bg-[#181818] border-[#2B2B2B]' : 'bg-white border-[#E0E0E0] shadow-2xs'
+                    }`}>
                       <OfficialSkillIcon skillId={skill.id} className="w-7 h-7" theme={theme} />
                     </div>
                     <div>
@@ -1184,7 +1200,11 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
                   </span>
                 </div>
 
-                <pre className="p-2.5 rounded bg-[#141414] border border-[#2B2B2B] text-[11px] font-mono text-[#9CDCFE] overflow-x-auto">
+                <pre className={`p-2.5 rounded border text-[11px] font-mono overflow-x-auto ${
+                  isDark
+                    ? 'bg-[#141414] border-[#2B2B2B] text-[#9CDCFE]'
+                    : 'bg-[#F8F9FA] border-slate-200 text-[#0066B8]'
+                }`}>
                   <code>{skill.codeExample}</code>
                 </pre>
               </div>
@@ -1364,7 +1384,9 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
 
           <form onSubmit={handleContactSubmit} className="space-y-4">
             <div className="space-y-1">
-              <label htmlFor="contact-name" className="block text-xs font-mono text-[#9CDCFE]">
+              <label htmlFor="contact-name" className={`block text-xs font-mono ${
+                isDark ? 'text-[#9CDCFE]' : 'text-[#005A9E] font-medium'
+              }`}>
                 name: string *
               </label>
               <input
@@ -1384,7 +1406,9 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="contact-email" className="block text-xs font-mono text-[#9CDCFE]">
+              <label htmlFor="contact-email" className={`block text-xs font-mono ${
+                isDark ? 'text-[#9CDCFE]' : 'text-[#005A9E] font-medium'
+              }`}>
                 email: string *
               </label>
               <input
@@ -1404,7 +1428,9 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="contact-msg" className="block text-xs font-mono text-[#9CDCFE]">
+              <label htmlFor="contact-msg" className={`block text-xs font-mono ${
+                isDark ? 'text-[#9CDCFE]' : 'text-[#005A9E] font-medium'
+              }`}>
                 message: string *
               </label>
               <textarea
@@ -1424,7 +1450,11 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
             </div>
 
             {contactStatus === 'success' && (
-              <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded bg-[#1E3A2F] border border-[#4EC9B0]/40 text-[#4EC9B0] text-xs font-mono">
+              <div className={`flex flex-wrap items-center justify-between gap-2 p-3 rounded border text-xs font-mono ${
+                isDark
+                  ? 'bg-[#1E3A2F] border-[#4EC9B0]/40 text-[#4EC9B0]'
+                  : 'bg-[#E6F4EA] border-[#34A853]/40 text-[#137333]'
+              }`}>
                 <span className="flex items-center gap-2">
                   <Codicon name="lock" className="!text-[14px]" />
                   <span>
@@ -1444,7 +1474,11 @@ export const WorkspaceViews: React.FC<WorkspaceViewsProps> = ({
             )}
 
             {contactStatus === 'error' && (
-              <div className="flex items-center gap-2 p-3 rounded bg-[#3A1E1E] border border-[#F48771]/40 text-[#F48771] text-xs font-mono">
+              <div className={`flex items-center gap-2 p-3 rounded border text-xs font-mono ${
+                isDark
+                  ? 'bg-[#3A1E1E] border-[#F48771]/40 text-[#F48771]'
+                  : 'bg-[#FCE8E6] border-[#EA4335]/40 text-[#C5221F]'
+              }`}>
                 <Codicon name="error" className="!text-[14px]" />
                 <span>{contactErrorText}</span>
               </div>

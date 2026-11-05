@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Codicon, SetiFileIcon, OfficialSkillIcon } from './OfficialIcons';
+import { Codicon, SetiFileIcon, OfficialSkillIcon, OfficialGeminiLogo } from './OfficialIcons';
 import {
   DEVELOPER_PROFILE,
   WORKSPACE_FILES,
@@ -8,6 +8,8 @@ import {
   EDUCATION_TIMELINE,
 } from '../data/portfolioData';
 import { OSPlatform } from '../utils/platform';
+import { GeminiChatPanel } from './GeminiChatPanel';
+import { askGemini } from '../services/geminiClient';
 
 export interface TerminalHistoryItem {
   id: string;
@@ -16,7 +18,7 @@ export interface TerminalHistoryItem {
   output: React.ReactNode;
 }
 
-export type BottomPanelTab = 'terminal';
+export type BottomPanelTab = 'terminal' | 'gemini';
 
 interface TerminalSession {
   id: string;
@@ -55,6 +57,7 @@ interface TerminalPanelProps {
 
 const QUICK_COMMANDS = [
   'help',
+  'gemini',
   'whoami',
   'projects',
   'skills',
@@ -68,6 +71,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
   isOpen,
   isExpanded,
   activeTab,
+  onSelectTab,
   onToggleOpen,
   onToggleExpand,
   onOpenFile,
@@ -99,15 +103,26 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
             second: '2-digit',
           }),
           output: (
-            <div className="space-y-1 text-xs leading-relaxed">
+            <div className="space-y-1.5 text-xs leading-relaxed">
               <p className="text-[#4EC9B0] font-semibold">
                 Visual Studio Code Integrated Terminal · MUSTAFA.dev ({DEVELOPER_PROFILE.name})
               </p>
               <p className="text-[#9CDCFE]">
-                Type <span className="text-[#DCDCAA] font-semibold">help</span> to view all
-                interactive portfolio commands, or click any quick command chip above. Press{' '}
-                <span className="text-[#CE9178]">Tab</span> to auto-complete.
+                Type <span className="text-[#DCDCAA] font-semibold">help</span> to view all commands.
+                The <span className="text-[#0078D4] font-semibold">Gemini AI Agent</span> is now integrated directly into this terminal!
               </p>
+              <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => onSelectTab('gemini')}
+                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#0078D4]/20 hover:bg-[#0078D4]/30 border border-[#0078D4]/40 text-[#4FC1FF] cursor-pointer transition-colors"
+                >
+                  <OfficialGeminiLogo className="w-3.5 h-3.5" />
+                  <span>Switch to Gemini Agent Chat Tab</span>
+                </button>
+                <span className="text-[#858585]">or run</span>
+                <code className="text-[#DCDCAA] bg-[#252526] px-1.5 py-0.5 rounded">gemini &lt;question&gt;</code>
+              </div>
             </div>
           ),
         },
@@ -126,8 +141,79 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
   ]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
 
+  // VS Code authentic draggable terminal resizer state
+  const [panelHeight, setPanelHeight] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('vscode_terminal_height');
+      if (saved) {
+        const val = parseInt(saved, 10);
+        if (!isNaN(val) && val >= 120 && val <= 850) return val;
+      }
+      return window.innerHeight < 700 ? 190 : 240;
+    }
+    return 240;
+  });
+  const [isResizing, setIsResizing] = useState<boolean>(false);
+  const dragStartYRef = useRef<number>(0);
+  const startHeightRef = useRef<number>(240);
+  const currentHeightRef = useRef<number>(panelHeight);
+
+  // Keep currentHeightRef in sync
+  useEffect(() => {
+    currentHeightRef.current = panelHeight;
+  }, [panelHeight]);
+
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Start resize drag handler (mouse and touch)
+  const handleStartResize = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    dragStartYRef.current = clientY;
+    startHeightRef.current = currentHeightRef.current;
+  };
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      const deltaY = dragStartYRef.current - clientY; // dragging UP increases height
+      const minHeight = 120;
+      const maxHeight = Math.max(260, window.innerHeight - 100);
+      const newHeight = Math.min(Math.max(startHeightRef.current + deltaY, minHeight), maxHeight);
+      currentHeightRef.current = newHeight;
+      setPanelHeight(newHeight);
+      try {
+        localStorage.setItem('vscode_terminal_height', newHeight.toString());
+      } catch {
+        // ignore
+      }
+    };
+
+    const handleEnd = () => {
+      setIsResizing(false);
+      try {
+        localStorage.setItem('vscode_terminal_height', currentHeightRef.current.toString());
+      } catch {
+        // ignore
+      }
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleEnd);
+    window.addEventListener('touchmove', handleMove, { passive: false });
+    window.addEventListener('touchend', handleEnd);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleEnd);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleEnd);
+    };
+  }, [isResizing]);
 
   const activeSession = sessions[0];
 
@@ -176,6 +262,10 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
       case 'help': {
         outputNode = (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1 text-xs py-1">
+            <div>
+              <span className="text-[#DCDCAA] font-semibold">gemini &lt;query&gt;</span>
+              <span className="text-[#858585]"> · Ask Gemini AI Agent directly in terminal</span>
+            </div>
             <div>
               <span className="text-[#DCDCAA] font-semibold">whoami</span>
               <span className="text-[#858585]"> · Display developer bio &amp; BCA CGPA</span>
@@ -234,6 +324,116 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
             </div>
           </div>
         );
+        break;
+      }
+
+      case 'gemini':
+      case 'ask':
+      case 'chat':
+      case 'agent': {
+        if (!arg) {
+          // If no query provided, switch to the dedicated visual Gemini agent tab
+          onSelectTab('gemini');
+          outputNode = (
+            <div className="space-y-1 text-xs py-1">
+              <p className="text-[#4EC9B0] flex items-center gap-1.5 font-semibold">
+                <OfficialGeminiLogo className="w-3.5 h-3.5" />
+                <span>Opened Gemini AI Agent Tab</span>
+              </p>
+              <p className="text-[#858585]">
+                Switched terminal view to full visual chat with typewriter streaming and reasoning thoughts.
+                You can also query directly inline: <code className="text-[#DCDCAA]">gemini Tell me about Mustafa's projects</code>
+              </p>
+            </div>
+          );
+        } else {
+          // Query directly inline within the terminal shell
+          const pendingEntryId = `cmd-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+          
+          // Initial thinking indicator entry
+          appendToActiveSession({
+            id: pendingEntryId,
+            command: trimmed,
+            timestamp,
+            output: (
+              <div className="flex items-center gap-2 py-1 text-xs text-[#0078D4] animate-pulse">
+                <OfficialGeminiLogo className="w-3.5 h-3.5 animate-spin" />
+                <span>Gemini AI Agent is thinking &amp; retrieving portfolio context...</span>
+              </div>
+            ),
+          });
+          setInput('');
+
+          try {
+            const res = await askGemini(arg);
+            setSessions((prev) =>
+              prev.map((s) => {
+                if (s.id !== activeSession.id) return s;
+                return {
+                  ...s,
+                  entries: s.entries.map((entry) => {
+                    if (entry.id !== pendingEntryId) return entry;
+                    return {
+                      ...entry,
+                      output: (
+                        <div className="space-y-2 text-xs py-1 leading-relaxed">
+                          {res.thoughts && res.thoughts.length > 0 && (
+                            <details className="text-[11px] bg-[#1E1E1E]/50 border border-[#2B2B2B] rounded p-2">
+                              <summary className="cursor-pointer text-[#858585] hover:text-[#CCCCCC] flex items-center gap-1 font-mono">
+                                <span>Thinking Process ({res.thoughts.length} steps)</span>
+                              </summary>
+                              <ul className="mt-1.5 space-y-1 list-disc list-inside text-[#858585]">
+                                {res.thoughts.map((t, i) => (
+                                  <li key={i}>{t}</li>
+                                ))}
+                              </ul>
+                            </details>
+                          )}
+                          <div className="text-[#CCCCCC] whitespace-pre-wrap font-sans">
+                            {res.reply}
+                          </div>
+                          <div className="flex items-center gap-2 pt-1 border-t border-[#2B2B2B] text-[10px] text-[#858585]">
+                            <OfficialGeminiLogo className="w-3 h-3 text-[#0078D4]" />
+                            <span>Model: {res.model}</span>
+                            <span>·</span>
+                            <button
+                              type="button"
+                              onClick={() => onSelectTab('gemini')}
+                              className="text-[#0078D4] hover:underline cursor-pointer"
+                            >
+                              Open in Gemini Agent Tab ↗
+                            </button>
+                          </div>
+                        </div>
+                      ),
+                    };
+                  }),
+                };
+              })
+            );
+          } catch (err) {
+            setSessions((prev) =>
+              prev.map((s) => {
+                if (s.id !== activeSession.id) return s;
+                return {
+                  ...s,
+                  entries: s.entries.map((entry) => {
+                    if (entry.id !== pendingEntryId) return entry;
+                    return {
+                      ...entry,
+                      output: (
+                        <p className="text-[#F48771] text-xs">
+                          Gemini Agent Error: {err instanceof Error ? err.message : 'Failed to query Gemini API'}
+                        </p>
+                      ),
+                    };
+                  }),
+                };
+              })
+            );
+          }
+          return;
+        }
         break;
       }
 
@@ -688,63 +888,133 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
   return (
     <section
       aria-label="VS Code Workbench Interactive Terminal"
-      className={`border-t ${panelBg} flex flex-col shrink-0 select-none ${
-        isExpanded ? 'h-64 sm:h-80 md:h-96' : 'h-40 sm:h-48 md:h-56'
+      style={{
+        height: isExpanded ? '85vh' : `${panelHeight}px`,
+        transition: isResizing ? 'none' : 'height 150ms ease-out',
+      }}
+      className={`border-t ${panelBg} flex flex-col shrink-0 select-none relative ${
+        isResizing ? 'cursor-row-resize' : ''
       }`}
     >
-      {/* Clean Single-Purpose VS Code Terminal Header */}
+      {/* Official VS Code Panel Sash (Draggable Top Resize Handle) */}
+      <div
+        onMouseDown={handleStartResize}
+        onTouchStart={handleStartResize}
+        onDoubleClick={onToggleExpand}
+        title="Drag up or down to resize terminal · Double-click to maximize / restore"
+        className={`group absolute -top-1 left-0 right-0 h-2.5 z-30 cursor-row-resize flex items-center justify-center transition-colors ${
+          isResizing ? 'bg-[#0078D4]' : 'hover:bg-[#0078D4]/70 active:bg-[#0078D4]'
+        }`}
+      >
+        {/* Subtle VS Code grab indicator bar visible on hover or dragging */}
+        <div
+          className={`w-12 h-[3px] rounded-full transition-opacity ${
+            isResizing ? 'bg-white opacity-100' : 'bg-[#0078D4] opacity-0 group-hover:opacity-100'
+          }`}
+        />
+      </div>
+
+      {/* Clean Dual-Purpose VS Code Terminal & Gemini Agent Header */}
       <div
         className={`flex items-center justify-between gap-2 px-3 h-8 sm:h-9 border-b ${
           isDark ? 'border-[#2B2B2B] bg-[#181818]' : 'border-[#E5E5E5] bg-[#F8F8F8]'
         } text-[10px] sm:text-[11px] shrink-0`}
       >
-        <div className="flex items-center gap-3 h-full min-w-0">
-          <div
-            className={`h-full inline-flex items-center gap-1.5 border-b border-[#0078D4] px-0.5 font-sans tracking-wide font-medium whitespace-nowrap shrink-0 ${
-              isDark ? 'text-white' : 'text-[#1F1F1F]'
+        <div className="flex items-center gap-1 sm:gap-2 h-full min-w-0">
+          {/* TAB 1: TERMINAL */}
+          <button
+            type="button"
+            onClick={() => onSelectTab('terminal')}
+            className={`h-full inline-flex items-center gap-1.5 px-2 font-sans tracking-wide font-medium whitespace-nowrap cursor-pointer transition-colors border-b-2 ${
+              activeTab === 'terminal'
+                ? isDark
+                  ? 'border-[#0078D4] text-white'
+                  : 'border-[#0078D4] text-[#1F1F1F]'
+                : isDark
+                ? 'border-transparent text-[#858585] hover:text-[#CCCCCC]'
+                : 'border-transparent text-[#6E7681] hover:text-[#1F1F1F]'
             }`}
           >
-            <Codicon name="terminal" className="!text-[13px] text-[#0078D4]" />
+            <Codicon
+              name="terminal"
+              className={`!text-[13px] ${activeTab === 'terminal' ? 'text-[#0078D4]' : ''}`}
+            />
             <span>TERMINAL</span>
-          </div>
-          <span className="hidden sm:inline text-[#858585] font-mono text-[11px] truncate">
-            mustafa-cli · Interactive Portfolio Shell
+          </button>
+
+          {/* TAB 2: GEMINI AGENT */}
+          <button
+            type="button"
+            onClick={() => onSelectTab('gemini')}
+            className={`h-full inline-flex items-center gap-1.5 px-2 font-sans tracking-wide font-medium whitespace-nowrap cursor-pointer transition-colors border-b-2 ${
+              activeTab === 'gemini'
+                ? isDark
+                  ? 'border-[#0078D4] text-white'
+                  : 'border-[#0078D4] text-[#1F1F1F]'
+                : isDark
+                ? 'border-transparent text-[#858585] hover:text-[#CCCCCC]'
+                : 'border-transparent text-[#6E7681] hover:text-[#1F1F1F]'
+            }`}
+          >
+            <OfficialGeminiLogo className="w-3.5 h-3.5 text-[#0078D4]" />
+            <span>GEMINI AGENT</span>
+            <span className="hidden sm:inline-block px-1 py-0.2 text-[9px] rounded bg-[#0078D4]/20 text-[#4FC1FF] font-mono">
+              AI Chat
+            </span>
+          </button>
+
+          <span className="hidden md:inline text-[#858585] font-mono text-[11px] truncate ml-2">
+            {activeTab === 'terminal'
+              ? 'mustafa-cli · Interactive Portfolio Shell'
+              : 'Gemini 3.1 Flash Lite · Portfolio Reasoning Agent'}
           </span>
         </div>
 
         {/* Clean Terminal Actions Bar */}
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-          <div className="hidden lg:flex items-center gap-1 mr-1">
-            {QUICK_COMMANDS.map((qCmd) => (
-              <button
-                key={qCmd}
-                type="button"
-                onClick={() => executeCommand(qCmd)}
-                className={`px-2 py-0.5 rounded text-[11px] font-mono transition-colors cursor-pointer whitespace-nowrap ${
-                  isDark
-                    ? 'bg-[#2B2B2B] hover:bg-[#3C3C3C] text-[#CCCCCC]'
-                    : 'bg-[#E5E5E5] hover:bg-[#D5D5D5] text-[#1F1F1F]'
-                }`}
-              >
-                {qCmd}
-              </button>
-            ))}
-          </div>
+          {activeTab === 'terminal' && (
+            <div className="hidden lg:flex items-center gap-1 mr-1">
+              {QUICK_COMMANDS.map((qCmd) => (
+                <button
+                  key={qCmd}
+                  type="button"
+                  onClick={() => executeCommand(qCmd)}
+                  className={`px-2 py-0.5 rounded text-[11px] font-mono transition-colors cursor-pointer whitespace-nowrap ${
+                    isDark
+                      ? 'bg-[#2B2B2B] hover:bg-[#3C3C3C] text-[#CCCCCC]'
+                      : 'bg-[#E5E5E5] hover:bg-[#D5D5D5] text-[#1F1F1F]'
+                  }`}
+                >
+                  {qCmd}
+                </button>
+              ))}
+            </div>
+          )}
 
-          <button
-            type="button"
-            onClick={() => appendToActiveSession(null, true)}
-            title="Clear Terminal"
-            className="p-1 rounded hover:bg-[#2A2D2E] text-[#868686] hover:text-white transition-colors cursor-pointer flex items-center justify-center"
-          >
-            <Codicon name="clear-all" className="!text-[14px]" />
-          </button>
+          {activeTab === 'terminal' && (
+            <button
+              type="button"
+              onClick={() => appendToActiveSession(null, true)}
+              title="Clear Terminal"
+              className={`p-1 rounded transition-colors cursor-pointer flex items-center justify-center ${
+                isDark
+                  ? 'hover:bg-[#2A2D2E] text-[#868686] hover:text-white'
+                  : 'hover:bg-[#E5E5E5] text-[#555555] hover:text-[#1E1E1E]'
+              }`}
+            >
+              <Codicon name="clear-all" className="!text-[14px]" />
+            </button>
+          )}
 
           <button
             type="button"
             onClick={onToggleExpand}
             title={isExpanded ? 'Restore Panel Size' : 'Maximize Panel Size'}
-            className="p-1 rounded hover:bg-[#2A2D2E] text-[#868686] hover:text-white transition-colors cursor-pointer flex items-center justify-center"
+            className={`p-1 rounded transition-colors cursor-pointer flex items-center justify-center ${
+              isDark
+                ? 'hover:bg-[#2A2D2E] text-[#868686] hover:text-white'
+                : 'hover:bg-[#E5E5E5] text-[#555555] hover:text-[#1E1E1E]'
+            }`}
           >
             <Codicon name={isExpanded ? 'chevron-down' : 'chevron-up'} className="!text-[14px]" />
           </button>
@@ -752,21 +1022,31 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
           <button
             type="button"
             onClick={onToggleOpen}
-            title="Close Terminal (Ctrl+`)"
-            className="p-1 rounded hover:bg-[#2A2D2E] text-[#868686] hover:text-white transition-colors cursor-pointer flex items-center justify-center"
+            title="Close Panel (Ctrl+`)"
+            className={`p-1 rounded transition-colors cursor-pointer flex items-center justify-center ${
+              isDark
+                ? 'hover:bg-[#2A2D2E] text-[#868686] hover:text-white'
+                : 'hover:bg-[#E5E5E5] text-[#555555] hover:text-[#1E1E1E]'
+            }`}
           >
             <Codicon name="close" className="!text-[14px]" />
           </button>
         </div>
       </div>
 
-      {/* Primary Interactive Terminal Pane */}
-      <div className="flex-1 flex min-h-0 overflow-hidden">
-        <div
-          ref={scrollContainerRef}
-          onClick={() => inputRef.current?.focus()}
-          className="flex-1 overflow-y-auto px-2.5 sm:px-4 py-2 font-mono space-y-2 cursor-text select-text min-w-0"
-        >
+      {/* Pane Content: Either Gemini Chat Panel or Standard Shell based on activeTab */}
+      {activeTab === 'gemini' ? (
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+          <GeminiChatPanel onOpenFile={onOpenFile} theme={theme} />
+        </div>
+      ) : (
+        /* Primary Interactive Terminal Pane */
+        <div className="flex-1 flex min-h-0 overflow-hidden">
+          <div
+            ref={scrollContainerRef}
+            onClick={() => inputRef.current?.focus()}
+            className="flex-1 overflow-y-auto px-2.5 sm:px-4 py-2 font-mono space-y-2 cursor-text select-text min-w-0"
+          >
           {/* Mobile & Tablet Quick Command Strip */}
           <div className="flex lg:hidden items-center gap-1.5 overflow-x-auto pb-1">
             {QUICK_COMMANDS.map((qCmd) => (
@@ -823,7 +1103,9 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
                   {item.timestamp}
                 </span>
               </div>
-              <div className="pl-2 sm:pl-3 border-l border-[#2B2B2B] overflow-x-auto">
+              <div className={`pl-2 sm:pl-3 border-l overflow-x-auto ${
+                isDark ? 'border-[#2B2B2B]' : 'border-[#E0E0E0]'
+              }`}>
                 {item.output}
               </div>
             </div>
@@ -875,6 +1157,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
           </div>
         </div>
       </div>
-    </section>
-  );
+    )}
+  </section>
+);
 };

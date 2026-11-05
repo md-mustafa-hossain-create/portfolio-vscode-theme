@@ -270,7 +270,7 @@ function generateLocalPortfolioAnswer(
  */
 export async function askGemini(
   message: string,
-  history: GeminiApiChatMessage[]
+  history: GeminiApiChatMessage[] = []
 ): Promise<GeminiResponsePayload> {
   const trimmed = message.trim();
   if (!trimmed) {

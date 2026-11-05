@@ -1,16 +1,14 @@
 import React from 'react';
-import { Codicon, OfficialGeminiLogo } from './OfficialIcons';
+import { Codicon } from './OfficialIcons';
 import { OSPlatform, OS_META } from '../utils/platform';
 
 interface MobileTouchBarProps {
-  activityView: 'explorer' | 'search' | 'extensions' | 'gemini';
+  activityView: 'explorer' | 'search' | 'extensions';
   sidebarOpen: boolean;
   terminalOpen: boolean;
-  onSelectActivity: (view: 'explorer' | 'search' | 'extensions' | 'gemini') => void;
+  onSelectActivity: (view: 'explorer' | 'search' | 'extensions') => void;
   onToggleTerminal: () => void;
   onOpenResume: () => void;
-  currentOS: OSPlatform;
-  onOpenOSSwitcher: () => void;
   theme: 'dark' | 'light';
   unreadCount?: number;
 }
@@ -22,8 +20,6 @@ export const MobileTouchBar: React.FC<MobileTouchBarProps> = ({
   onSelectActivity,
   onToggleTerminal,
   onOpenResume,
-  currentOS,
-  onOpenOSSwitcher,
   theme,
   unreadCount = 0,
 }) => {
@@ -76,20 +72,20 @@ export const MobileTouchBar: React.FC<MobileTouchBarProps> = ({
         <span className="text-[10px] font-medium tracking-tight mt-0.5">Search</span>
       </button>
 
-      {/* 3. Gemini AI Assistant */}
+      {/* 3. Tech Stack & Extensions */}
       <button
         type="button"
-        onClick={() => onSelectActivity('gemini')}
+        onClick={() => onSelectActivity('extensions')}
         className={`flex flex-col items-center justify-center flex-1 h-full min-w-[48px] py-1 cursor-pointer transition-colors ${
-          activityView === 'gemini' && sidebarOpen
-            ? 'text-[#4FC1FF] font-semibold'
+          activityView === 'extensions' && sidebarOpen
+            ? 'text-[#0078D4] font-semibold'
             : isDark
             ? 'text-[#858585] hover:text-[#CCCCCC]'
             : 'text-[#616161] hover:text-[#1F1F1F]'
         }`}
       >
-        <OfficialGeminiLogo className="w-[18px] h-[18px]" />
-        <span className="text-[10px] font-medium tracking-tight mt-0.5">Gemini</span>
+        <Codicon name="extensions" className="!text-[18px]" />
+        <span className="text-[10px] font-medium tracking-tight mt-0.5">Stack</span>
       </button>
 
       {/* 4. Terminal Panel */}
@@ -116,27 +112,6 @@ export const MobileTouchBar: React.FC<MobileTouchBarProps> = ({
       >
         <Codicon name="file-pdf" className="!text-[18px]" />
         <span className="text-[10px] font-semibold tracking-tight mt-0.5">Resume</span>
-      </button>
-
-      {/* 6. OS Platform Switcher */}
-      <button
-        type="button"
-        onClick={onOpenOSSwitcher}
-        title={`Current OS: ${OS_META[currentOS].name}. Tap to switch`}
-        className={`flex flex-col items-center justify-center flex-1 h-full min-w-[48px] py-1 cursor-pointer transition-colors ${
-          isDark ? 'text-[#858585] hover:text-white' : 'text-[#616161] hover:text-black'
-        }`}
-      >
-        <span className="text-[14px] leading-none">
-          {currentOS === 'macos' && '🍎'}
-          {currentOS === 'windows' && '🪟'}
-          {currentOS === 'linux' && '🐧'}
-          {currentOS === 'android' && '🤖'}
-          {currentOS === 'ios' && '📱'}
-        </span>
-        <span className="text-[9px] font-mono tracking-tight mt-0.5 uppercase">
-          {currentOS.slice(0, 3)}
-        </span>
       </button>
     </nav>
   );
